@@ -269,11 +269,7 @@
 <body>
 <div class="dashboard">
 
-  <div class="header">
-    <div class="header-left">
-      <h1>RECOVERY RATE MONITOR</h1>
-      <p id="subtitle">Cumulative Cash Collection vs Billed Revenue</p>
-    </div>
+  <div style="display:flex;justify-content:flex-end;margin-bottom:16px;">
     <div class="fy-badge" id="fy-badge">—</div>
   </div>
 
@@ -315,7 +311,7 @@
 
   <div class="pillar-grid" id="pillar-grid"></div>
 
-  <div class="footer-note" id="footer-note">RECOVERY RATE MONITOR &nbsp;|&nbsp; DATA: rp_NetHireUR_Revised</div>
+
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -375,16 +371,14 @@ function last(arr) { return arr[arr.length - 1] || 0; }
 function render() {
   const d = getParams();
 
-  // Totals
-  const totalBilledSeries = d.months.map((_,i) =>
-    d.abiMainBilled[i] + d.abiPresBilled[i] + d.nonMainBilled[i] + d.nonPresBilled[i]);
-  const totalCashSeries = d.months.map((_,i) =>
-    d.abiMainCash[i] + d.abiPresCash[i] + d.nonMainCash[i] + d.nonPresCash[i]);
+  // ABI Mainstream only for chart and KPIs
+  const totalBilledSeries = d.abiMainBilled;
+  const totalCashSeries   = d.abiMainCash;
 
   const totalBilled = last(totalBilledSeries);
   const totalCash   = last(totalCashSeries);
   const totalPerf   = totalBilled > 0 ? totalCash / totalBilled : 0;
-  const avgTarget   = (d.abiMainTarget + d.abiPresTarget + d.nonMainTarget + d.nonPresTarget) / 4;
+  const avgTarget   = d.abiMainTarget;
   const variance    = totalPerf - avgTarget;
 
   // Header
