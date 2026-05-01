@@ -30,12 +30,12 @@
     background: var(--bg);
     color: var(--text-primary);
     font-family: var(--font-mono);
-    font-size: 12px;
-    padding: 20px;
-    min-height: 100vh;
+    font-size: 11px;
+    padding: 8px;
+    overflow: hidden;
   }
 
-  .dashboard { max-width: 960px; margin: 0 auto; }
+  .dashboard { max-width: 100%; margin: 0; }
 
   .header {
     display: flex;
@@ -75,14 +75,14 @@
   .kpi-row {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 12px;
-    margin-bottom: 24px;
+    gap: 6px;
+    margin-bottom: 8px;
   }
 
   .kpi {
     background: var(--surface);
     border: 1px solid var(--border);
-    padding: 14px 16px;
+    padding: 8px 10px;
     position: relative;
     overflow: hidden;
   }
@@ -101,14 +101,14 @@
 
   .kpi-label {
     color: var(--text-muted);
-    font-size: 10px;
+    font-size: 9px;
     text-transform: uppercase;
     letter-spacing: 1.5px;
-    margin-bottom: 6px;
+    margin-bottom: 3px;
   }
 
   .kpi-value {
-    font-size: 22px;
+    font-size: 16px;
     font-family: var(--font-display);
     letter-spacing: 1px;
     line-height: 1;
@@ -116,8 +116,8 @@
 
   .kpi-sub {
     color: var(--text-secondary);
-    font-size: 10px;
-    margin-top: 4px;
+    font-size: 9px;
+    margin-top: 2px;
   }
 
   .pos { color: var(--perf-above); }
@@ -126,21 +126,21 @@
   .chart-container {
     background: var(--surface);
     border: 1px solid var(--border);
-    padding: 20px;
-    margin-bottom: 16px;
+    padding: 10px;
+    margin-bottom: 8px;
   }
 
   .chart-title {
-    font-size: 11px;
+    font-size: 9px;
     text-transform: uppercase;
     letter-spacing: 2px;
     color: var(--text-secondary);
-    margin-bottom: 16px;
+    margin-bottom: 8px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 4px;
   }
 
   .legend {
@@ -165,21 +165,21 @@
   .pillar-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-    margin-bottom: 16px;
+    gap: 6px;
+    margin-bottom: 0;
   }
 
   .pillar-card {
     background: var(--surface);
     border: 1px solid var(--border);
-    padding: 16px;
+    padding: 8px 10px;
   }
 
   .pillar-name {
     font-family: var(--font-display);
     letter-spacing: 1px;
-    font-size: 14px;
-    margin-bottom: 10px;
+    font-size: 12px;
+    margin-bottom: 6px;
     color: var(--text-primary);
   }
 
@@ -230,22 +230,22 @@
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 4px;
-    margin-top: 12px;
+    margin-top: 6px;
     text-align: center;
   }
 
   .pstat-val {
-    font-size: 15px;
+    font-size: 12px;
     font-family: var(--font-display);
     letter-spacing: 0.5px;
   }
 
   .pstat-lbl {
-    font-size: 9px;
+    font-size: 8px;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 1px;
-    margin-top: 2px;
+    margin-top: 1px;
   }
 
   .no-data {
@@ -269,7 +269,7 @@
 <body>
 <div class="dashboard">
 
-  <div style="display:flex;justify-content:flex-end;margin-bottom:16px;">
+  <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
     <div class="fy-badge" id="fy-badge">—</div>
   </div>
 
@@ -306,7 +306,7 @@
         <div class="legend-item"><div class="legend-line" style="border-color:var(--perf-above)"></div> Performance</div>
       </div>
     </div>
-    <canvas id="mainChart" height="260"></canvas>
+    <canvas id="mainChart" height="160"></canvas>
   </div>
 
   <div class="pillar-grid" id="pillar-grid"></div>
