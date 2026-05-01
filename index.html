@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recovery Rate Dashboard</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Bebas+Neue&display=swap');
+
+  :root {
+    --bg: #0f0f0f;
+    --surface: #1a1a1a;
+    --surface2: #222222;
+    --border: #2e2e2e;
+    --billed: #3a3a3a;
+    --collected: #c8c8c8;
+    --target-line: #e8c547;
+    --perf-above: #7ecba1;
+    --perf-below: #e07c6a;
+    --text-primary: #f0f0f0;
+    --text-secondary: #888;
+    --text-muted: #555;
+    --font-display: 'Bebas Neue', sans-serif;
+    --font-mono: 'DM Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 20px;
+    min-height: 100vh;
+  }
+
+  .dashboard {
+    max-width: 960px;
+    margin: 0 auto;
+  }
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 16px;
+  }
+
+  .header-left h1 {
+    font-family: var(--font-display);
+    font-size: 32px;
+    letter-spacing: 2px;
+    color: var(--text-primary);
+    line-height: 1;
+  }
+
+  .header-left p {
+    color: var(--text-secondary);
+    font-size: 11px;
+    margin-top: 4px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .kpi {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 14px 16px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .kpi::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 3px; height: 100%;
+    background: var(--text-muted);
+  }
+
+  .kpi.highlight::before { background: var(--collected); }
+  .kpi.above::before { background: var(--perf-above); }
+  .kpi.below::before { background: var(--perf-below); }
+
+  .kpi-label {
+    color: var(--text-muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 6px;
+  }
+
+  .kpi-value {
+    font-size: 22px;
+    font-family: var(--font-display);
+    letter-spacing: 1px;
+    line-height: 1;
+  }
+
+  .kpi-sub {
+    color: var(--text-secondary);
+    font-size: 10px;
+    margin-top: 4px;
+  }
+
+  .filter-bar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+
+  .filter-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .filter-btn.active, .filter-btn:hover {
+    background: var(--surface2);
+    border-color: var(--collected);
+    color: var(--text-primary);
+  }
+
+  .chart-container {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+
+  .chart-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    color: var(--text-secondary);
+  }
+
+  .legend-swatch {
+    width: 14px;
+    height: 8px;
+  }
+
+  .legend-line {
+    width: 18px;
+    height: 2px;
+    border-top: 2px dashed;
+  }
+
+  canvas {
+    width: 100% !important;
+    display: block;
+  }
+
+  .pillar-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .pillar-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 16px;
+  }
+
+  .pillar-name {
+    font-family: var(--font-display);
+    letter-spacing: 1px;
+    font-size: 14px;
+    margin-bottom: 10px;
+    color: var(--text-primary);
+  }
+
+  .progress-wrap {
+    margin-bottom: 8px;
+  }
+
+  .progress-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+  }
+
+  .progress-track {
+    height: 20px;
+    background: var(--billed);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--collected);
+    transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+  }
+
+  .target-marker {
+    position: absolute;
+    top: -3px;
+    width: 2px;
+    height: calc(100% + 6px);
+    background: var(--target-line);
+    z-index: 2;
+  }
+
+  .target-marker::after {
+    content: 'T';
+    position: absolute;
+    top: -14px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    color: var(--target-line);
+    font-family: var(--font-mono);
+  }
+
+  .pillar-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    margin-top: 10px;
+  }
+
+  .pstat {
+    text-align: center;
+  }
+
+  .pstat-val {
+    font-size: 14px;
+    font-family: var(--font-display);
+    letter-spacing: 0.5px;
+  }
+
+  .pstat-lbl {
+    font-size: 9px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  .variance-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 11px;
+    padding: 2px 6px;
+  }
+
+  .variance-badge.pos { color: var(--perf-above); }
+  .variance-badge.neg { color: var(--perf-below); }
+
+  .footer-note {
+    color: var(--text-muted);
+    font-size: 10px;
+    text-align: right;
+    letter-spacing: 0.5px;
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+<div class="dashboard">
+
+  <div class="header">
+    <div class="header-left">
+      <h1>RECOVERY RATE MONITOR</h1>
+      <p>Cumulative Cash Collection vs Billed Revenue &mdash; All Pillars</p>
+    </div>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi">
+      <div class="kpi-label">Total Billed</div>
+      <div class="kpi-value" id="kpi-billed">—</div>
+      <div class="kpi-sub">Cumulative Revenue</div>
+    </div>
+    <div class="kpi highlight">
+      <div class="kpi-label">Total Collected</div>
+      <div class="kpi-value" id="kpi-collected">—</div>
+      <div class="kpi-sub">Cumulative Cash</div>
+    </div>
+    <div class="kpi" id="kpi-perf-card">
+      <div class="kpi-label">Performance</div>
+      <div class="kpi-value" id="kpi-perf">—</div>
+      <div class="kpi-sub" id="kpi-variance-sub">vs Target</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Target</div>
+      <div class="kpi-value" id="kpi-target">—</div>
+      <div class="kpi-sub">Recovery Rate Target</div>
+    </div>
+  </div>
+
+  <div class="filter-bar">
+    <button class="filter-btn active" onclick="setFilter('all', this)">ALL PILLARS</button>
+    <button class="filter-btn" onclick="setFilter('ABIMainstream', this)">ABI MAINSTREAM</button>
+    <button class="filter-btn" onclick="setFilter('ABIPrestige', this)">ABI PRESTIGE</button>
+    <button class="filter-btn" onclick="setFilter('NonABIMainstream', this)">NON-ABI MAINSTREAM</button>
+    <button class="filter-btn" onclick="setFilter('NonABIPrestige', this)">NON-ABI PRESTIGE</button>
+  </div>
+
+  <div class="chart-container">
+    <div class="chart-title">
+      <span>CUMULATIVE BILLED vs COLLECTED</span>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-swatch" style="background:var(--billed)"></div> Billed</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:var(--collected)"></div> Collected</div>
+        <div class="legend-item"><div class="legend-line" style="border-color:var(--target-line)"></div> Target Rate</div>
+        <div class="legend-item"><div class="legend-line" style="border-color:var(--perf-above)"></div> Performance</div>
+      </div>
+    </div>
+    <canvas id="mainChart" height="260"></canvas>
+  </div>
+
+  <div class="pillar-grid" id="pillar-grid"></div>
+
+  <div class="footer-note">DATA: rp_NetHireUR_Revised &nbsp;|&nbsp; FINANCIAL YEAR: APRIL START &nbsp;|&nbsp; REPLACE sampleData WITH YOUR POWER BI DATASET VALUES</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+
+// ─── SAMPLE DATA ─────────────────────────────────────────────────────────────
+// Replace this with your actual Power BI dataset values.
+// months: array of labels, each pillar has parallel arrays for billed & cash.
+// targets are the RRV lookup values (as decimals, e.g. 0.72 = 72%)
+// ──────────────────────────────────────────────────────────────────────────────
+const sampleData = {
+  months: ["Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar"],
+  pillars: {
+    ABIMainstream: {
+      label: "ABI Mainstream",
+      billed:    [120000,245000,370000,502000,630000,758000,890000,1020000,1145000,1260000,1380000,1490000],
+      cash:      [ 88000,179000,272000,368000,463000,558000,658000, 756000, 851000, 937000,1028000,1111000],
+      target: 0.74
+    },
+    ABIPrestige: {
+      label: "ABI Prestige",
+      billed:    [60000,122000,185000,250000,315000,382000,450000,519000,586000,650000,714000,775000],
+      cash:      [45000, 92000,140000,190000,240000,292000,345000,398000,450000,500000,551000,600000],
+      target: 0.78
+    },
+    NonABIMainstream: {
+      label: "Non-ABI Mainstream",
+      billed:    [80000,163000,248000,335000,421000,508000,596000,686000,774000,858000,942000,1020000],
+      cash:      [52000,107000,163000,220000,276000,333000,391000,450000,508000,563000,619000,670000],
+      target: 0.65
+    },
+    NonABIPrestige: {
+      label: "Non-ABI Prestige",
+      billed:    [40000, 82000,124000,168000,212000,256000,302000,348000,393000,436000,479000,520000],
+      cash:      [25000, 52000, 79000,107000,135000,163000,193000,222000,251000,278000,306000,333000],
+      target: 0.63
+    }
+  }
+};
+
+let activeFilter = 'all';
+let mainChart = null;
+
+function fmt(n) {
+  if (n >= 1000000) return '£' + (n/1000000).toFixed(2) + 'M';
+  if (n >= 1000) return '£' + (n/1000).toFixed(0) + 'K';
+  return '£' + n.toFixed(0);
+}
+
+function fmtPct(n) { return (n * 100).toFixed(1) + '%'; }
+
+function getActivePillars() {
+  if (activeFilter === 'all') return Object.keys(sampleData.pillars);
+  return [activeFilter];
+}
+
+function aggregate(keys) {
+  const months = sampleData.months;
+  const billed = months.map((_,i) => keys.reduce((s,k) => s + sampleData.pillars[k].billed[i], 0));
+  const cash   = months.map((_,i) => keys.reduce((s,k) => s + sampleData.pillars[k].cash[i], 0));
+  const target = keys.reduce((s,k) => s + sampleData.pillars[k].target, 0) / keys.length;
+  return { billed, cash, target };
+}
+
+function buildChart(keys) {
+  const { billed, cash, target } = aggregate(keys);
+  const months = sampleData.months;
+  const perfLine = billed.map((b,i) => b > 0 ? cash[i]/b : 0);
+  const targetLine = months.map(() => target);
+
+  if (mainChart) mainChart.destroy();
+
+  const ctx = document.getElementById('mainChart').getContext('2d');
+
+  mainChart = new Chart(ctx, {
+    data: {
+      labels: months,
+      datasets: [
+        {
+          type: 'bar',
+          label: 'Total Billed',
+          data: billed,
+          backgroundColor: '#3a3a3a',
+          order: 3,
+          yAxisID: 'yAmount',
+          barPercentage: 0.75,
+          categoryPercentage: 0.85,
+        },
+        {
+          type: 'bar',
+          label: 'Cash Collected',
+          data: cash,
+          backgroundColor: '#c8c8c8',
+          order: 2,
+          yAxisID: 'yAmount',
+          barPercentage: 0.75,
+          categoryPercentage: 0.85,
+        },
+        {
+          type: 'line',
+          label: 'Target Rate',
+          data: targetLine,
+          borderColor: '#e8c547',
+          borderDash: [6,3],
+          borderWidth: 1.5,
+          pointRadius: 0,
+          order: 0,
+          yAxisID: 'yRate',
+          tension: 0,
+        },
+        {
+          type: 'line',
+          label: 'Performance',
+          data: perfLine,
+          borderColor: '#7ecba1',
+          borderWidth: 2,
+          pointRadius: 3,
+          pointBackgroundColor: '#7ecba1',
+          pointBorderColor: '#0f0f0f',
+          pointBorderWidth: 1,
+          order: 1,
+          yAxisID: 'yRate',
+          tension: 0.3,
+          fill: false,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      animation: { duration: 700 },
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1a1a1a',
+          borderColor: '#2e2e2e',
+          borderWidth: 1,
+          titleColor: '#888',
+          bodyColor: '#f0f0f0',
+          titleFont: { family: 'DM Mono', size: 11 },
+          bodyFont: { family: 'DM Mono', size: 11 },
+          callbacks: {
+            label(ctx) {
+              if (ctx.dataset.yAxisID === 'yAmount') return ` ${ctx.dataset.label}: ${fmt(ctx.parsed.y)}`;
+              return ` ${ctx.dataset.label}: ${fmtPct(ctx.parsed.y)}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: '#222', drawBorder: false },
+          ticks: { color: '#666', font: { family: 'DM Mono', size: 10 } },
+          border: { color: '#2e2e2e' }
+        },
+        yAmount: {
+          position: 'left',
+          grid: { color: '#222' },
+          ticks: {
+            color: '#666',
+            font: { family: 'DM Mono', size: 10 },
+            callback: v => fmt(v)
+          },
+          border: { color: '#2e2e2e' }
+        },
+        yRate: {
+          position: 'right',
+          min: 0, max: 1,
+          grid: { display: false },
+          ticks: {
+            color: '#666',
+            font: { family: 'DM Mono', size: 10 },
+            callback: v => (v*100).toFixed(0)+'%'
+          },
+          border: { color: '#2e2e2e' }
+        }
+      }
+    }
+  });
+}
+
+function buildPillarCards(keys) {
+  const grid = document.getElementById('pillar-grid');
+  grid.innerHTML = '';
+  keys.forEach(k => {
+    const p = sampleData.pillars[k];
+    const lastBilled = p.billed[p.billed.length - 1];
+    const lastCash   = p.cash[p.cash.length - 1];
+    const perf = lastBilled > 0 ? lastCash / lastBilled : 0;
+    const variance = perf - p.target;
+    const pct = (perf * 100).toFixed(1);
+    const tpct = (p.target * 100).toFixed(1);
+    const vpct = (Math.abs(variance) * 100).toFixed(1);
+    const isAbove = variance >= 0;
+    const fillPct = Math.min(perf * 100, 100).toFixed(1);
+    const targetPct = Math.min(p.target * 100, 100).toFixed(1);
+
+    const card = document.createElement('div');
+    card.className = 'pillar-card';
+    card.innerHTML = `
+      <div class="pillar-name">${p.label.toUpperCase()}</div>
+      <div class="progress-wrap">
+        <div class="progress-labels">
+          <span>${fmt(lastCash)} collected</span>
+          <span>${fmt(lastBilled)} billed</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-fill" style="width:${fillPct}%"></div>
+          <div class="target-marker" style="left:${targetPct}%"></div>
+        </div>
+      </div>
+      <div class="pillar-stats">
+        <div class="pstat">
+          <div class="pstat-val">${pct}%</div>
+          <div class="pstat-lbl">Performance</div>
+        </div>
+        <div class="pstat">
+          <div class="pstat-val">${tpct}%</div>
+          <div class="pstat-lbl">Target</div>
+        </div>
+        <div class="pstat">
+          <div class="pstat-val variance-badge ${isAbove ? 'pos' : 'neg'}">${isAbove ? '▲' : '▼'} ${vpct}%</div>
+          <div class="pstat-lbl">Variance</div>
+        </div>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+function updateKPIs(keys) {
+  const { billed, cash, target } = aggregate(keys);
+  const lb = billed[billed.length - 1];
+  const lc = cash[cash.length - 1];
+  const perf = lb > 0 ? lc / lb : 0;
+  const variance = perf - target;
+  const isAbove = variance >= 0;
+
+  document.getElementById('kpi-billed').textContent    = fmt(lb);
+  document.getElementById('kpi-collected').textContent = fmt(lc);
+  document.getElementById('kpi-perf').textContent      = fmtPct(perf);
+  document.getElementById('kpi-target').textContent    = fmtPct(target);
+
+  const vpct = (Math.abs(variance) * 100).toFixed(1);
+  document.getElementById('kpi-variance-sub').innerHTML =
+    `<span class="variance-badge ${isAbove ? 'pos' : 'neg'}">${isAbove ? '▲' : '▼'} ${vpct}%</span> vs Target`;
+
+  const card = document.getElementById('kpi-perf-card');
+  card.className = 'kpi ' + (isAbove ? 'above' : 'below');
+}
+
+function setFilter(filter, btn) {
+  activeFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  render();
+}
+
+function render() {
+  const keys = getActivePillars();
+  updateKPIs(keys);
+  buildChart(keys);
+  buildPillarCards(keys);
+}
+
+render();
+</script>
+</body>
+</html>
