@@ -120,6 +120,32 @@
     margin-top: 2px;
   }
 
+  .filter-bar {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+
+  .filter-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .filter-btn.active, .filter-btn:hover {
+    background: var(--surface2);
+    border-color: var(--collected);
+    color: var(--text-primary);
+  }
+
   .pos { color: var(--perf-above); }
   .neg { color: var(--perf-below); }
 
@@ -273,6 +299,14 @@
     <div class="fy-badge" id="fy-badge">—</div>
   </div>
 
+  <div class="filter-bar">
+    <button class="filter-btn" onclick="setFilter('all',this)">ALL PILLARS</button>
+    <button class="filter-btn active" onclick="setFilter('abiMain',this)">ABI MAINSTREAM</button>
+    <button class="filter-btn" onclick="setFilter('abiPres',this)">ABI PRESTIGE</button>
+    <button class="filter-btn" onclick="setFilter('nonMain',this)">NON-ABI MAINSTREAM</button>
+    <button class="filter-btn" onclick="setFilter('nonPres',this)">NON-ABI PRESTIGE</button>
+  </div>
+
   <div class="kpi-row">
     <div class="kpi">
       <div class="kpi-label">Total Billed</div>
@@ -317,203 +351,138 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
 
+let currentFilter = 'abiMain';
+let chartInstance = null;
+let DATA = null;
+
 function getParams() {
   const p = new URLSearchParams(window.location.search);
-  const get = (k, fallback) => {
-    const v = p.get(k);
-    return (v !== null && v !== '' && v !== 'null') ? v : fallback;
-  };
-
-  // Month labels pipe-separated e.g. Mar-25|Apr-25|...
+  const get = (k, fallback) => { const v = p.get(k); return (v !== null && v !== '' && v !== 'null') ? v : fallback; };
   const monthsRaw = get('months', null);
   const months = monthsRaw ? monthsRaw.split('|') : ['Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb'];
-
-  // Each series is pipe-separated values matching the months array
-  const parseSeries = (key) => {
-    const raw = get(key, null);
-    if (!raw) return months.map(() => 0);
-    return raw.split('|').map(v => parseFloat(v) || 0);
-  };
-
+  const parseSeries = (key) => { const raw = get(key,null); if(!raw) return months.map(()=>0); return raw.split('|').map(v=>parseFloat(v)||0); };
   return {
-    fy:               get('fy', 'FY —'),
-    months,
-    // Cumulative billed by month for each pillar
-    abiMainBilled:    parseSeries('amb'),
-    abiMainCash:      parseSeries('amc'),
-    abiMainTarget:    parseFloat(get('amt', '0.74')),
-    abiPresBilled:    parseSeries('apb'),
-    abiPresCash:      parseSeries('apc'),
-    abiPresTarget:    parseFloat(get('apt', '0.78')),
-    nonMainBilled:    parseSeries('nmb'),
-    nonMainCash:      parseSeries('nmc'),
-    nonMainTarget:    parseFloat(get('nmt', '0.65')),
-    nonPresBilled:    parseSeries('npb'),
-    nonPresCash:      parseSeries('npc'),
-    nonPresTarget:    parseFloat(get('npt', '0.63')),
+    fy: get('fy','FY —'), months,
+    abiMainBilled: parseSeries('amb'), abiMainCash: parseSeries('amc'), abiMainTarget: parseFloat(get('amt','0.74')),
+    abiPresBilled: parseSeries('apb'), abiPresCash: parseSeries('apc'), abiPresTarget: parseFloat(get('apt','0.78')),
+    nonMainBilled: parseSeries('nmb'), nonMainCash: parseSeries('nmc'), nonMainTarget: parseFloat(get('nmt','0.65')),
+    nonPresBilled: parseSeries('npb'), nonPresCash: parseSeries('npc'), nonPresTarget: parseFloat(get('npt','0.63')),
   };
 }
 
-function fmt(n) {
-  if (isNaN(n) || n === 0) return '£0';
-  if (n >= 1000000) return '£' + (n/1000000).toFixed(2) + 'M';
-  if (n >= 1000) return '£' + (n/1000).toFixed(0) + 'K';
-  return '£' + Math.round(n).toLocaleString();
+function cumulative(arr) { let s=0; return arr.map(v=>{s+=v;return s;}); }
+function fmt(n) { if(isNaN(n)||n===0) return '£0'; if(n>=1000000) return '£'+(n/1000000).toFixed(2)+'M'; if(n>=1000) return '£'+(n/1000).toFixed(0)+'K'; return '£'+Math.round(n).toLocaleString(); }
+function fmtPct(n) { if(isNaN(n)) return '0.0%'; return (n*100).toFixed(1)+'%'; }
+function last(arr) { return arr[arr.length-1]||0; }
+
+function getFilterData(d, filter) {
+  switch(filter) {
+    case 'abiMain': return { billed:cumulative(d.abiMainBilled), cash:cumulative(d.abiMainCash), target:d.abiMainTarget };
+    case 'abiPres': return { billed:cumulative(d.abiPresBilled), cash:cumulative(d.abiPresCash), target:d.abiPresTarget };
+    case 'nonMain': return { billed:cumulative(d.nonMainBilled), cash:cumulative(d.nonMainCash), target:d.nonMainTarget };
+    case 'nonPres': return { billed:cumulative(d.nonPresBilled), cash:cumulative(d.nonPresCash), target:d.nonPresTarget };
+    default: return {
+      billed: cumulative(d.abiMainBilled.map((v,i)=>v+d.abiPresBilled[i]+d.nonMainBilled[i]+d.nonPresBilled[i])),
+      cash:   cumulative(d.abiMainCash.map((v,i)=>v+d.abiPresCash[i]+d.nonMainCash[i]+d.nonPresCash[i])),
+      target: (d.abiMainTarget+d.abiPresTarget+d.nonMainTarget+d.nonPresTarget)/4
+    };
+  }
 }
 
-function fmtPct(n) {
-  if (isNaN(n)) return '0.0%';
-  return (n * 100).toFixed(1) + '%';
+function setFilter(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  updateChart();
 }
 
-function last(arr) { return arr[arr.length - 1] || 0; }
+function updateChart() {
+  const d = DATA;
+  const f = getFilterData(d, currentFilter);
+  const totalBilled = last(f.billed), totalCash = last(f.cash);
+  const totalPerf = totalBilled>0 ? totalCash/totalBilled : 0;
+  const variance = totalPerf - f.target;
+  const isAbove = variance >= 0;
 
-function render() {
-  const d = getParams();
-
-  // ABI Mainstream only for chart and KPIs
-  const totalBilledSeries = d.abiMainBilled;
-  const totalCashSeries   = d.abiMainCash;
-
-  const totalBilled = last(totalBilledSeries);
-  const totalCash   = last(totalCashSeries);
-  const totalPerf   = totalBilled > 0 ? totalCash / totalBilled : 0;
-  const avgTarget   = d.abiMainTarget;
-  const variance    = totalPerf - avgTarget;
-
-  // Header
-  document.getElementById('fy-badge').textContent = d.fy;
   document.getElementById('kpi-billed').textContent    = fmt(totalBilled);
   document.getElementById('kpi-collected').textContent = fmt(totalCash);
   document.getElementById('kpi-perf').textContent      = fmtPct(totalPerf);
-  document.getElementById('kpi-target').textContent    = fmtPct(avgTarget);
+  document.getElementById('kpi-target').textContent    = fmtPct(f.target);
+  document.getElementById('kpi-variance-sub').innerHTML = `<span class="${isAbove?'pos':'neg'}">${isAbove?'▲':'▼'} ${(Math.abs(variance)*100).toFixed(1)}%</span> vs Target`;
+  document.getElementById('kpi-perf-card').className = 'kpi '+(isAbove?'above':'below');
 
-  const vpct = (Math.abs(variance) * 100).toFixed(1);
-  const isAbove = variance >= 0;
-  document.getElementById('kpi-variance-sub').innerHTML =
-    `<span class="${isAbove ? 'pos' : 'neg'}">${isAbove ? '▲' : '▼'} ${vpct}%</span> vs Target`;
-  document.getElementById('kpi-perf-card').className = 'kpi ' + (isAbove ? 'above' : 'below');
+  const perfLine   = f.billed.map((b,i)=>b>0?f.cash[i]/b:0);
+  const targetLine = d.months.map(()=>f.target);
 
-  // Main chart
-  const perfLine   = totalBilledSeries.map((b,i) => b > 0 ? totalCashSeries[i]/b : 0);
-  const targetLine = d.months.map(() => avgTarget);
-
+  if (chartInstance) chartInstance.destroy();
   const ctx = document.getElementById('mainChart').getContext('2d');
-  new Chart(ctx, {
+  chartInstance = new Chart(ctx, {
     data: {
       labels: d.months,
       datasets: [
-        {
-          type: 'bar', label: 'Total Billed', data: totalBilledSeries,
-          backgroundColor: '#3a3a3a', order: 3, yAxisID: 'yAmount',
-          barPercentage: 0.75, categoryPercentage: 0.85,
-        },
-        {
-          type: 'bar', label: 'Cash Collected', data: totalCashSeries,
-          backgroundColor: '#c8c8c8', order: 2, yAxisID: 'yAmount',
-          barPercentage: 0.75, categoryPercentage: 0.85,
-        },
-        {
-          type: 'line', label: 'Target Rate', data: targetLine,
-          borderColor: '#e8c547', borderDash: [6,3], borderWidth: 1.5,
-          pointRadius: 0, order: 0, yAxisID: 'yRate', tension: 0,
-        },
-        {
-          type: 'line', label: 'Performance', data: perfLine,
-          borderColor: '#7ecba1', borderWidth: 2,
-          pointRadius: 3, pointBackgroundColor: '#7ecba1',
-          pointBorderColor: '#0f0f0f', pointBorderWidth: 1,
-          order: 1, yAxisID: 'yRate', tension: 0.3,
-        }
+        { type:'bar',  label:'Total Billed',   data:f.billed,   backgroundColor:'#3a3a3a', order:3, yAxisID:'yAmount', barPercentage:0.75, categoryPercentage:0.85 },
+        { type:'bar',  label:'Cash Collected', data:f.cash,     backgroundColor:'#c8c8c8', order:2, yAxisID:'yAmount', barPercentage:0.75, categoryPercentage:0.85 },
+        { type:'line', label:'Target Rate',    data:targetLine, borderColor:'#e8c547', borderDash:[6,3], borderWidth:1.5, pointRadius:0, order:0, yAxisID:'yRate', tension:0 },
+        { type:'line', label:'Performance',    data:perfLine,   borderColor:'#7ecba1', borderWidth:2, pointRadius:3, pointBackgroundColor:'#7ecba1', pointBorderColor:'#0f0f0f', pointBorderWidth:1, order:1, yAxisID:'yRate', tension:0.3 }
       ]
     },
     options: {
-      responsive: true,
-      animation: { duration: 700 },
-      interaction: { mode: 'index', intersect: false },
+      responsive:true, animation:{duration:400},
+      interaction:{mode:'index',intersect:false},
       plugins: {
-        legend: { display: false },
-        tooltip: {
-          backgroundColor: '#1a1a1a', borderColor: '#2e2e2e', borderWidth: 1,
-          titleColor: '#888', bodyColor: '#f0f0f0',
-          titleFont: { family: 'DM Mono', size: 11 },
-          bodyFont: { family: 'DM Mono', size: 11 },
-          callbacks: {
-            label(ctx) {
-              if (ctx.dataset.yAxisID === 'yAmount') return ` ${ctx.dataset.label}: ${fmt(ctx.parsed.y)}`;
-              return ` ${ctx.dataset.label}: ${fmtPct(ctx.parsed.y)}`;
-            }
-          }
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:'#1a1a1a', borderColor:'#2e2e2e', borderWidth:1,
+          titleColor:'#888', bodyColor:'#f0f0f0',
+          titleFont:{family:'DM Mono',size:11}, bodyFont:{family:'DM Mono',size:11},
+          callbacks:{label(ctx){
+            if(ctx.dataset.yAxisID==='yAmount') return ` ${ctx.dataset.label}: ${fmt(ctx.parsed.y)}`;
+            return ` ${ctx.dataset.label}: ${fmtPct(ctx.parsed.y)}`;
+          }}
         }
       },
       scales: {
-        x: {
-          grid: { color: '#222' },
-          ticks: { color: '#666', font: { family: 'DM Mono', size: 10 } },
-          border: { color: '#2e2e2e' }
-        },
-        yAmount: {
-          position: 'left', grid: { color: '#222' },
-          ticks: { color: '#666', font: { family: 'DM Mono', size: 10 }, callback: v => fmt(v) },
-          border: { color: '#2e2e2e' }
-        },
-        yRate: {
-          position: 'right', min: 0, max: 1, grid: { display: false },
-          ticks: { color: '#666', font: { family: 'DM Mono', size: 10 }, callback: v => (v*100).toFixed(0)+'%' },
-          border: { color: '#2e2e2e' }
-        }
+        x:{grid:{color:'#222'},ticks:{color:'#666',font:{family:'DM Mono',size:10}},border:{color:'#2e2e2e'}},
+        yAmount:{position:'left',grid:{color:'#222'},ticks:{color:'#666',font:{family:'DM Mono',size:10},callback:v=>fmt(v)},border:{color:'#2e2e2e'}},
+        yRate:{position:'right',min:0,max:1,grid:{display:false},ticks:{color:'#666',font:{family:'DM Mono',size:10},callback:v=>(v*100).toFixed(0)+'%'},border:{color:'#2e2e2e'}}
       }
     }
   });
 
-  // Pillar cards
+  // Pillar cards always show all four
   const pillars = [
-    { label: 'ABI MAINSTREAM',     billed: d.abiMainBilled, cash: d.abiMainCash, target: d.abiMainTarget },
-    { label: 'ABI PRESTIGE',       billed: d.abiPresBilled, cash: d.abiPresCash, target: d.abiPresTarget },
-    { label: 'NON-ABI MAINSTREAM', billed: d.nonMainBilled, cash: d.nonMainCash, target: d.nonMainTarget },
-    { label: 'NON-ABI PRESTIGE',   billed: d.nonPresBilled, cash: d.nonPresCash, target: d.nonPresTarget },
+    {label:'ABI MAINSTREAM',     billed:cumulative(d.abiMainBilled), cash:cumulative(d.abiMainCash), target:d.abiMainTarget},
+    {label:'ABI PRESTIGE',       billed:cumulative(d.abiPresBilled), cash:cumulative(d.abiPresCash), target:d.abiPresTarget},
+    {label:'NON-ABI MAINSTREAM', billed:cumulative(d.nonMainBilled), cash:cumulative(d.nonMainCash), target:d.nonMainTarget},
+    {label:'NON-ABI PRESTIGE',   billed:cumulative(d.nonPresBilled), cash:cumulative(d.nonPresCash), target:d.nonPresTarget},
   ];
-
   const grid = document.getElementById('pillar-grid');
   grid.innerHTML = '';
   pillars.forEach(p => {
-    const lb = last(p.billed);
-    const lc = last(p.cash);
-    const perf = lb > 0 ? lc / lb : 0;
-    const vari = perf - p.target;
-    const isUp = vari >= 0;
-    const fillPct   = Math.min(perf * 100, 100).toFixed(1);
-    const targetPct = Math.min(p.target * 100, 100).toFixed(1);
-
+    const lb=last(p.billed), lc=last(p.cash);
+    const perf=lb>0?lc/lb:0, vari=perf-p.target, isUp=vari>=0;
     const card = document.createElement('div');
     card.className = 'pillar-card';
     card.innerHTML = `
       <div class="pillar-name">${p.label}</div>
-      <div class="progress-labels">
-        <span>${fmt(lc)} collected</span>
-        <span>${fmt(lb)} billed</span>
-      </div>
+      <div class="progress-labels"><span>${fmt(lc)} collected</span><span>${fmt(lb)} billed</span></div>
       <div class="progress-track">
-        <div class="progress-fill" style="width:${fillPct}%"></div>
-        <div class="target-marker" style="left:${targetPct}%"></div>
+        <div class="progress-fill" style="width:${Math.min(perf*100,100).toFixed(1)}%"></div>
+        <div class="target-marker" style="left:${Math.min(p.target*100,100).toFixed(1)}%"></div>
       </div>
       <div class="pillar-stats">
-        <div>
-          <div class="pstat-val">${fmtPct(perf)}</div>
-          <div class="pstat-lbl">Performance</div>
-        </div>
-        <div>
-          <div class="pstat-val">${fmtPct(p.target)}</div>
-          <div class="pstat-lbl">Target</div>
-        </div>
-        <div>
-          <div class="pstat-val ${isUp ? 'pos' : 'neg'}">${isUp ? '▲' : '▼'} ${(Math.abs(vari)*100).toFixed(1)}%</div>
-          <div class="pstat-lbl">Variance</div>
-        </div>
-      </div>
-    `;
+        <div><div class="pstat-val">${fmtPct(perf)}</div><div class="pstat-lbl">Performance</div></div>
+        <div><div class="pstat-val">${fmtPct(p.target)}</div><div class="pstat-lbl">Target</div></div>
+        <div><div class="pstat-val ${isUp?'pos':'neg'}">${isUp?'▲':'▼'} ${(Math.abs(vari)*100).toFixed(1)}%</div><div class="pstat-lbl">Variance</div></div>
+      </div>`;
     grid.appendChild(card);
   });
+}
+
+function render() {
+  DATA = getParams();
+  document.getElementById('fy-badge').textContent = DATA.fy;
+  updateChart();
 }
 
 render();
