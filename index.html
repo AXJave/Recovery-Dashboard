@@ -370,7 +370,8 @@ function updateChart() {
     chartInstance.data.datasets[3].data = perfLine;
     chartInstance.options.scales.yRate.max = yRateMax;
     chartInstance.options.scales.yRate.min = yRateMin;
-    chartInstance.update('none');
+    chartInstance.options.scales.yAmount.min = 0;
+    chartInstance.update();
   } else {
     const canvas = document.getElementById('mainChart');
     canvas.width  = canvas.parentElement.offsetWidth;
