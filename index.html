@@ -358,8 +358,11 @@ function updateChart() {
   const validPerf  = perfLine.filter(v => v !== null && !isNaN(v) && isFinite(v));
   const maxPerf    = validPerf.length ? Math.max(...validPerf) : 1;
   const minPerf    = validPerf.length ? Math.min(...validPerf) : 0.6;
-  const yRateMax   = (Math.ceil(Math.max(maxPerf, f.target) * 10) + 1) / 10;
-  const yRateMin   = Math.max(0, (Math.floor(Math.min(minPerf, f.target) * 10) - 1) / 10);
+  const maxVal     = Math.max(maxPerf, f.target);
+  const minVal     = Math.min(minPerf, f.target);
+  const yRateMax   = (Math.ceil(maxVal * 10) + 1) / 10;
+  const yRateMin   = Math.max(0, (Math.floor(minVal * 10) - 1) / 10);
+  const yRateStep  = 0.1;
   const targetLine = d.months.map(()=>f.target);
 
   if (chartInstance) {
@@ -370,6 +373,7 @@ function updateChart() {
     chartInstance.data.datasets[3].data = perfLine;
     chartInstance.options.scales.yRate.max = yRateMax;
     chartInstance.options.scales.yRate.min = yRateMin;
+    chartInstance.options.scales.yRate.ticks.stepSize = yRateStep;
     chartInstance.options.scales.yAmount.min = 0;
     chartInstance.update();
   } else {
@@ -405,7 +409,7 @@ function updateChart() {
         scales:{
           x:{grid:{color:'#ebebeb'},ticks:{color:'#999',font:{family:'Inter',size:9}},border:{color:'#e0e0e0'}},
           yAmount:{position:'right',min:0,grid:{display:false},ticks:{color:'#999',font:{family:'Inter',size:9},callback:v=>fmt(v)},border:{color:'#e0e0e0'}},
-          yRate:{position:'left',min:yRateMin,max:yRateMax,grid:{color:'#ebebeb'},ticks:{stepSize:0.1,color:'#999',font:{family:'Inter',size:9},callback:v=>(v*100).toFixed(0)+'%'},border:{color:'#e0e0e0'}}
+          yRate:{position:'left',min:yRateMin,max:yRateMax,grid:{color:'#ebebeb'},ticks:{stepSize:yRateStep,color:'#999',font:{family:'Inter',size:9},callback:v=>Math.round(v*100)+'%'},border:{color:'#e0e0e0'}}
         }
       }
     });
