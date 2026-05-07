@@ -294,7 +294,7 @@ function getParams() {
   const primary = get('fy', null);
   const primaryData = parseBlock('');
   if (primary && primaryData) result[primary] = primaryData;
-  [2,3,4,5].forEach(i => {
+  [2,3,4,5,6,7,8,9,10].forEach(i => {
     const fy = get('fy'+i, null);
     const data = parseBlock(''+i);
     if (fy && data) result[fy] = data;
