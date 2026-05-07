@@ -248,7 +248,8 @@ let FY_LIST = [];
 function getParams() {
   const p = new URLSearchParams(window.location.search);
   const get = (k, fb) => { const v = p.get(k); return (v !== null && v !== '' && v !== 'null') ? v : fb; };
-  const parseSeries = (raw, months) => { if (!raw) return months.map(()=>0); return raw.split('|').map(v=>parseFloat(v)||0); };
+  const parseSeries = (raw, months) => { if (!raw) return months.map(()=>0); return raw.split('|').map(v=>(parseFloat(v)||0)*1000); };
+  const parseSeriesRaw = (raw, months) => { if (!raw) return months.map(()=>0); return raw.split('|').map(v=>parseFloat(v)||0); };
 
   const parseBlock = (suffix) => {
     const monthsRaw = get('months'+suffix, null);
@@ -259,19 +260,19 @@ function getParams() {
       abiMainBilled:   parseSeries(get('amb'+suffix,null), months),
       abiMainCash:     parseSeries(get('amc'+suffix,null), months),
       abiMainTarget:   parseFloat(get('amt'+suffix,'0.74')),
-      abiMainMonthly:  parseSeries(get('amm'+suffix,null), months),
+      abiMainMonthly:  parseSeriesRaw(get('amm'+suffix,null), months),
       abiPresBilled:   parseSeries(get('apb'+suffix,null), months),
       abiPresCash:     parseSeries(get('apc'+suffix,null), months),
       abiPresTarget:   parseFloat(get('apt'+suffix,'0.78')),
-      abiPresMonthly:  parseSeries(get('apm'+suffix,null), months),
+      abiPresMonthly:  parseSeriesRaw(get('apm'+suffix,null), months),
       nonMainBilled:   parseSeries(get('nmb'+suffix,null), months),
       nonMainCash:     parseSeries(get('nmc'+suffix,null), months),
       nonMainTarget:   parseFloat(get('nmt'+suffix,'0.65')),
-      nonMainMonthly:  parseSeries(get('nmm'+suffix,null), months),
+      nonMainMonthly:  parseSeriesRaw(get('nmm'+suffix,null), months),
       nonPresBilled:   parseSeries(get('npb'+suffix,null), months),
       nonPresCash:     parseSeries(get('npc'+suffix,null), months),
       nonPresTarget:   parseFloat(get('npt'+suffix,'0.63')),
-      nonPresMonthly:  parseSeries(get('npm'+suffix,null), months),
+      nonPresMonthly:  parseSeriesRaw(get('npm'+suffix,null), months),
     };
   };
 
@@ -360,8 +361,7 @@ function updateChart() {
 
   // Calculate monthly collection % = monthly billed / total FY billed
   const totalBilledFY = last(f.billed);
-  const monthlyBilled = f.monthlyBilled || [];
-  const collectionPct = monthlyBilled.map(v => totalBilledFY > 0 ? v / totalBilledFY : 0);
+  const collectionPct = f.billed.map(v => totalBilledFY > 0 ? v / totalBilledFY : 0);
   const perfLine   = f.billed.map((b,i)=>b>0?f.cash[i]/b:null);
   const validPerf  = perfLine.filter(v => v !== null && !isNaN(v) && isFinite(v));
   const maxPerf    = validPerf.length ? Math.max(...validPerf) : 1;
