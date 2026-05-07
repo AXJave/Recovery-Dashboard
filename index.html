@@ -152,7 +152,7 @@
   .neg { color: var(--perf-below); }
 
   .chart-container { background: var(--surface); border: 1px solid var(--border); padding: 10px; margin-bottom: 8px; flex-shrink: 0; }
-  .chart-wrapper { position: relative; height: 160px; width: 100%; flex-shrink: 0; }
+  .chart-wrapper { position: relative; height: 220px; width: 100%; flex-shrink: 0; }
 
   .chart-title {
     font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px;
@@ -391,7 +391,7 @@ function updateChart() {
   } else {
   const canvas = document.getElementById('mainChart');
   canvas.width  = canvas.parentElement.offsetWidth;
-  canvas.height = 160;
+  canvas.height = 220;
   const ctx = canvas.getContext('2d');
   chartInstance = new Chart(ctx, {
     data: {
