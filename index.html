@@ -377,6 +377,8 @@ function updateChart() {
   document.getElementById('kpi-perf-card').className = 'kpi '+(isAbove?'above':'below');
 
   const perfLine   = f.billed.map((b,i)=>b>0?f.cash[i]/b:null);
+  const maxPerf = Math.max(...perfLine.filter(v => v !== null && !isNaN(v)));
+  const yRateMax = Math.ceil(Math.max(maxPerf, f.target) * 10 + 1) / 10;
   const targetLine = d.months.map(()=>f.target);
 
   if (chartInstance) {
@@ -386,7 +388,7 @@ function updateChart() {
     chartInstance.data.datasets[1].data = f.cash;
     chartInstance.data.datasets[2].data = targetLine;
     chartInstance.data.datasets[3].data = perfLine;
-    chartInstance.options.scales.yRate.max = 1;
+    chartInstance.options.scales.yRate.max = yRateMax;
     chartInstance.update('none');
   } else {
   const canvas = document.getElementById('mainChart');
@@ -421,7 +423,7 @@ function updateChart() {
       scales:{
         x:{grid:{color:'#ebebeb'},ticks:{color:'#999',font:{family:'Inter',size:9}},border:{color:'#e0e0e0'}},
         yAmount:{position:'right',grid:{display:false},ticks:{color:'#999',font:{family:'Inter',size:9},callback:v=>fmt(v)},border:{color:'#e0e0e0'}},
-        yRate:{position:'left',min:0,max:1,grid:{color:'#ebebeb'},ticks:{color:'#999',font:{family:'Inter',size:9},callback:v=>(v*100).toFixed(0)+'%'},border:{color:'#e0e0e0'}}
+        yRate:{position:'left',min:0,max:yRateMax,grid:{color:'#ebebeb'},ticks:{color:'#999',font:{family:'Inter',size:9},callback:v=>(v*100).toFixed(0)+'%'},border:{color:'#e0e0e0'}}
       }
     }
   });
