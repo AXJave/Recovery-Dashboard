@@ -377,8 +377,9 @@ function updateChart() {
   document.getElementById('kpi-perf-card').className = 'kpi '+(isAbove?'above':'below');
 
   const perfLine   = f.billed.map((b,i)=>b>0?f.cash[i]/b:null);
-  const maxPerf = Math.max(...perfLine.filter(v => v !== null && !isNaN(v)));
-  const yRateMax = Math.ceil(Math.max(maxPerf, f.target) * 10 + 1) / 10;
+  const validPerf  = perfLine.filter(v => v !== null && !isNaN(v) && isFinite(v));
+  const maxPerf    = validPerf.length ? Math.max(...validPerf) : 1;
+  const yRateMax   = Math.ceil(Math.max(maxPerf, f.target) / 0.1) * 0.1 + 0.1;
   const targetLine = d.months.map(()=>f.target);
 
   if (chartInstance) {
