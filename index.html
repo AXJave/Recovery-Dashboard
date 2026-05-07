@@ -58,24 +58,6 @@
     flex-shrink: 0;
   }
 
-  .brand { display: flex; align-items: center; gap: 8px; }
-
-  .brand-logo {
-    background: var(--collected);
-    color: #242424;
-    font-weight: 700;
-    font-size: 11px;
-    padding: 4px 8px;
-  }
-
-  .brand-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-primary);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-
   .top-controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
   .fy-label {
@@ -294,7 +276,7 @@ function getParams() {
   const primary = get('fy', null);
   const primaryData = parseBlock('');
   if (primary && primaryData) result[primary] = primaryData;
-  [2,3,4,5].forEach(i => {
+  [2,3,4,5,6,7,8,9,10].forEach(i => {
     const fy = get('fy'+i, null);
     const data = parseBlock(''+i);
     if (fy && data) result[fy] = data;
@@ -376,54 +358,55 @@ function updateChart() {
   const validPerf  = perfLine.filter(v => v !== null && !isNaN(v) && isFinite(v));
   const maxPerf    = validPerf.length ? Math.max(...validPerf) : 1;
   const yRateMax   = Math.ceil(Math.max(maxPerf, f.target) / 0.1) * 0.1 + 0.1;
+  const yRateMin   = 0.6;
   const targetLine = d.months.map(()=>f.target);
 
   if (chartInstance) {
-    // Update existing chart data without destroying — prevents any resize
     chartInstance.data.labels = d.months;
     chartInstance.data.datasets[0].data = f.billed;
     chartInstance.data.datasets[1].data = f.cash;
     chartInstance.data.datasets[2].data = targetLine;
     chartInstance.data.datasets[3].data = perfLine;
     chartInstance.options.scales.yRate.max = yRateMax;
+    chartInstance.options.scales.yRate.min = yRateMin;
     chartInstance.update('none');
   } else {
-  const canvas = document.getElementById('mainChart');
-  canvas.width  = canvas.parentElement.offsetWidth;
-  canvas.height = 220;
-  const ctx = canvas.getContext('2d');
-  chartInstance = new Chart(ctx, {
-    data: {
-      labels: d.months,
-      datasets: [
-        { type:'bar',  label:'Total Billed',   data:f.billed,   backgroundColor:'#d0d0d0', order:3, yAxisID:'yAmount', barPercentage:0.8, categoryPercentage:0.85 },
-        { type:'bar',  label:'Cash Collected', data:f.cash,     backgroundColor:'rgba(174,235,89,0.9)', order:2, yAxisID:'yAmount', barPercentage:0.8, categoryPercentage:0.85 },
-        { type:'line', label:'Target',         data:targetLine, borderColor:'#FF7F00', borderDash:[5,3], borderWidth:1.5, pointRadius:0, order:0, yAxisID:'yRate', tension:0 },
-        { type:'line', label:'Performance',    data:perfLine,   borderColor:'#242424', borderWidth:1.5, pointRadius:2, pointBackgroundColor:'#242424', pointBorderColor:'#F7F7F7', pointBorderWidth:1, order:1, yAxisID:'yRate', tension:0.3, spanGaps:false }
-      ]
-    },
-    options: {
-      responsive:false, maintainAspectRatio:false, animation:{duration:350},
-      interaction:{mode:'index',intersect:false},
-      plugins:{
-        legend:{display:false},
-        tooltip:{
-          backgroundColor:'#ffffff', borderColor:'#e0e0e0', borderWidth:1,
-          titleColor:'#999', bodyColor:'#242424',
-          titleFont:{family:'Inter',size:10}, bodyFont:{family:'Inter',size:10},
-          callbacks:{label(ctx){
-            if(ctx.dataset.yAxisID==='yAmount') return ` ${ctx.dataset.label}: ${fmt(ctx.parsed.y)}`;
-            return ` ${ctx.dataset.label}: ${fmtPct(ctx.parsed.y)}`;
-          }}
-        }
+    const canvas = document.getElementById('mainChart');
+    canvas.width  = canvas.parentElement.offsetWidth;
+    canvas.height = 220;
+    const ctx = canvas.getContext('2d');
+    chartInstance = new Chart(ctx, {
+      data: {
+        labels: d.months,
+        datasets: [
+          { type:'bar',  label:'Total Billed',   data:f.billed,   backgroundColor:'#d0d0d0', order:3, yAxisID:'yAmount', barPercentage:0.8, categoryPercentage:0.85 },
+          { type:'bar',  label:'Cash Collected', data:f.cash,     backgroundColor:'rgba(174,235,89,0.9)', order:2, yAxisID:'yAmount', barPercentage:0.8, categoryPercentage:0.85 },
+          { type:'line', label:'Target',         data:targetLine, borderColor:'#FF7F00', borderDash:[5,3], borderWidth:1.5, pointRadius:0, order:0, yAxisID:'yRate', tension:0 },
+          { type:'line', label:'Performance',    data:perfLine,   borderColor:'#242424', borderWidth:1.5, pointRadius:2, pointBackgroundColor:'#242424', pointBorderColor:'#F7F7F7', pointBorderWidth:1, order:1, yAxisID:'yRate', tension:0.3, spanGaps:false }
+        ]
       },
-      scales:{
-        x:{grid:{color:'#ebebeb'},ticks:{color:'#999',font:{family:'Inter',size:9}},border:{color:'#e0e0e0'}},
-        yAmount:{position:'right',grid:{display:false},ticks:{color:'#999',font:{family:'Inter',size:9},callback:v=>fmt(v)},border:{color:'#e0e0e0'}},
-        yRate:{position:'left',min:60,max:yRateMax,grid:{color:'#ebebeb'},ticks:{color:'#999',font:{family:'Inter',size:9},callback:v=>(v*100).toFixed(0)+'%'},border:{color:'#e0e0e0'}}
+      options: {
+        responsive:false, maintainAspectRatio:false, animation:{duration:350},
+        interaction:{mode:'index',intersect:false},
+        plugins:{
+          legend:{display:false},
+          tooltip:{
+            backgroundColor:'#ffffff', borderColor:'#e0e0e0', borderWidth:1,
+            titleColor:'#999', bodyColor:'#242424',
+            titleFont:{family:'Inter',size:10}, bodyFont:{family:'Inter',size:10},
+            callbacks:{label(ctx){
+              if(ctx.dataset.yAxisID==='yAmount') return ` ${ctx.dataset.label}: ${fmt(ctx.parsed.y)}`;
+              return ` ${ctx.dataset.label}: ${fmtPct(ctx.parsed.y)}`;
+            }}
+          }
+        },
+        scales:{
+          x:{grid:{color:'#ebebeb'},ticks:{color:'#999',font:{family:'Inter',size:9}},border:{color:'#e0e0e0'}},
+          yAmount:{position:'right',grid:{display:false},ticks:{color:'#999',font:{family:'Inter',size:9},callback:v=>fmt(v)},border:{color:'#e0e0e0'}},
+          yRate:{position:'left',min:yRateMin,max:yRateMax,grid:{color:'#ebebeb'},ticks:{color:'#999',font:{family:'Inter',size:9},callback:v=>(v*100).toFixed(0)+'%'},border:{color:'#e0e0e0'}}
+        }
       }
-    }
-  });
+    });
   }
 
   const pillars = [
