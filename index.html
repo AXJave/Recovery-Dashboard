@@ -420,7 +420,7 @@ function updateChart() {
       scales:{
         x:{grid:{color:'#ebebeb'},ticks:{color:'#999',font:{family:'Inter',size:9}},border:{color:'#e0e0e0'}},
         yAmount:{position:'right',grid:{display:false},ticks:{color:'#999',font:{family:'Inter',size:9},callback:v=>fmt(v)},border:{color:'#e0e0e0'}},
-        yRate:{position:'left',min:0,max:yRateMax,grid:{color:'#ebebeb'},ticks:{color:'#999',font:{family:'Inter',size:9},callback:v=>(v*100).toFixed(0)+'%'},border:{color:'#e0e0e0'}}
+        yRate:{position:'left',min:60,max:yRateMax,grid:{color:'#ebebeb'},ticks:{color:'#999',font:{family:'Inter',size:9},callback:v=>(v*100).toFixed(0)+'%'},border:{color:'#e0e0e0'}}
       }
     }
   });
