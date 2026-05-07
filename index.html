@@ -267,7 +267,7 @@ let FY_LIST = [];
 function getParams() {
   const p = new URLSearchParams(window.location.search);
   const get = (k, fb) => { const v = p.get(k); return (v !== null && v !== '' && v !== 'null') ? v : fb; };
-  const parseSeries = (raw, months) => { if (!raw) return months.map(()=>0); return raw.split('|').map(v=>parseFloat(v)||0); };
+  const parseSeries = (raw, months) => { if (!raw) return months.map(()=>0); return raw.split('|').map(v=>(parseFloat(v)||0)*1000); };
 
   const parseBlock = (suffix) => {
     const monthsRaw = get('months'+suffix, null);
