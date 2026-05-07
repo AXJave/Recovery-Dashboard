@@ -140,6 +140,7 @@
   .neg { color: var(--perf-below); }
 
   .chart-container { background: var(--surface); border: 1px solid var(--border); padding: 10px; margin-bottom: 10px; }
+  .chart-wrapper { position: relative; height: 160px; width: 100%; }
 
   .chart-title {
     font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px;
@@ -240,7 +241,7 @@
         <div class="legend-item"><div class="legend-line" style="border-color:#242424"></div>Performance</div>
       </div>
     </div>
-    <canvas id="mainChart" height="155"></canvas>
+    <div class="chart-wrapper"><canvas id="mainChart"></canvas></div>
   </div>
 
   <div class="pillar-grid" id="pillar-grid"></div>
@@ -367,7 +368,10 @@ function updateChart() {
   const targetLine = d.months.map(()=>f.target);
 
   if (chartInstance) chartInstance.destroy();
-  const ctx = document.getElementById('mainChart').getContext('2d');
+  const canvas = document.getElementById('mainChart');
+  canvas.width  = canvas.parentElement.offsetWidth;
+  canvas.height = 160;
+  const ctx = canvas.getContext('2d');
   chartInstance = new Chart(ctx, {
     data: {
       labels: d.months,
@@ -379,7 +383,7 @@ function updateChart() {
       ]
     },
     options: {
-      responsive:true, animation:{duration:350},
+      responsive:false, maintainAspectRatio:false, animation:{duration:350},
       interaction:{mode:'index',intersect:false},
       plugins:{
         legend:{display:false},
