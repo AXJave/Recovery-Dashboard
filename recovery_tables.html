@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recovery Tables</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+  :root {
+    --bg: #F7F7F7; --surface: #ffffff; --border: #e0e0e0;
+    --collected: #AEEB59; --target-line: #FF7F00; --perf-above: #AEEB59; --perf-below: #F85858;
+    --text-primary: #242424; --text-secondary: #666; --text-muted: #999; --font: 'Inter', sans-serif;
+    --header-bg: #242424; --header-text: #F7F7F7; --row-alt: #f9f9f9;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow-y: auto; overflow-x: hidden; }
+  body { background: var(--bg); color: var(--text-primary); font-family: var(--font); font-size: 11px; padding: 10px; }
+  .top-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  .fy-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+  .fy-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text-secondary); font-family: var(--font); font-size: 10px; font-weight: 500; padding: 4px 10px; cursor: pointer; transition: all 0.15s; }
+  .fy-btn.active { background: var(--collected); border-color: var(--collected); color: #242424; font-weight: 700; }
+  .fy-btn:hover:not(.active) { border-color: var(--collected); color: var(--text-primary); }
+  .table-section { background: var(--surface); border: 1px solid var(--border); margin-bottom: 12px; overflow-x: auto; }
+  .table-title { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; font-size: 10px; }
+  th { background: var(--header-bg); color: var(--header-text); padding: 6px 8px; text-align: right; font-weight: 600; font-size: 9px; letter-spacing: 0.5px; white-space: nowrap; border-right: 1px solid #333; }
+  th:first-child { text-align: left; border-right: 2px solid #555; min-width: 70px; }
+  th.pillar-header { text-align: center; background: #333; border-bottom: 1px solid #555; }
+  td { padding: 5px 8px; text-align: right; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td:first-child { text-align: left; font-weight: 600; border-right: 2px solid var(--border); background: #f5f5f5; }
+  tr:nth-child(even) td { background: var(--row-alt); }
+  tr:nth-child(even) td:first-child { background: #efefef; }
+  tr.total-row td { font-weight: 700; background: #f0f0f0; border-top: 2px solid var(--border); }
+  tr.total-row td:first-child { background: #e8e8e8; }
+  .pos { color: #2a9d2a; font-weight: 600; }
+  .neg { color: var(--perf-below); font-weight: 600; }
+  .no-data { text-align: center; padding: 30px; color: var(--text-muted); font-size: 11px; text-transform: uppercase; }
+  .pillar-group { border-right: 2px solid var(--border); }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <span class="fy-label">Financial Year</span>
+  <div id="fy-selector" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
+</div>
+
+<div class="table-section">
+  <div class="table-title">Cumulative Cash &amp; Revenue by Closure Month</div>
+  <div id="table1-container"></div>
+</div>
+
+<div class="table-section">
+  <div class="table-title">Performance, Target &amp; Collection % by Closure Month</div>
+  <div id="table2-container"></div>
+</div>
+
+<script>
+let currentFY = null;
+let ALL_DATA = {};
+let FY_LIST = [];
+
+function getParams() {
+  const p = new URLSearchParams(window.location.search);
+  const get = (k, fb) => { const v = p.get(k); return (v !== null && v !== '' && v !== 'null') ? v : fb; };
+  const parseSeries = (raw, months) => {
+    if (!raw) return months.map(()=>0);
+    return raw.split('|').map(v=>(parseFloat(v)||0)*1000);
+  };
+  const parseBlock = (suffix) => {
+    const monthsRaw = get('months'+suffix, null);
+    const months = monthsRaw ? monthsRaw.split('|') : [];
+    if (!months.length) return null;
+    return {
+      months,
+      abiMainBilled:  parseSeries(get('amb'+suffix,null), months),
+      abiMainCash:    parseSeries(get('amc'+suffix,null), months),
+      abiMainTarget:  parseFloat(get('amt'+suffix,'0.74')),
+      abiPresBilled:  parseSeries(get('apb'+suffix,null), months),
+      abiPresCash:    parseSeries(get('apc'+suffix,null), months),
+      abiPresTarget:  parseFloat(get('apt'+suffix,'0.78')),
+      nonMainBilled:  parseSeries(get('nmb'+suffix,null), months),
+      nonMainCash:    parseSeries(get('nmc'+suffix,null), months),
+      nonMainTarget:  parseFloat(get('nmt'+suffix,'0.65')),
+      nonPresBilled:  parseSeries(get('npb'+suffix,null), months),
+      nonPresCash:    parseSeries(get('npc'+suffix,null), months),
+      nonPresTarget:  parseFloat(get('npt'+suffix,'0.63')),
+    };
+  };
+  const result = {};
+  const primary = get('fy', null);
+  const primaryData = parseBlock('');
+  if (primary && primaryData) result[primary] = primaryData;
+  [2,3,4,5,6,7,8,9,10].forEach(i => {
+    const fy = get('fy'+i, null);
+    const data = parseBlock(''+i);
+    if (fy && data) result[fy] = data;
+  });
+  return result;
+}
+
+function fmt(n) {
+  if (isNaN(n)||n===0) return '£0';
+  if (n>=1000000) return '£'+(n/1000000).toFixed(2)+'M';
+  if (n>=1000) return '£'+(n/1000).toFixed(0)+'K';
+  return '£'+Math.round(n).toLocaleString();
+}
+function fmtPct(n) { if(isNaN(n)||!isFinite(n)) return '-'; return (n*100).toFixed(1)+'%'; }
+function last(arr) { return arr&&arr.length ? arr[arr.length-1] : 0; }
+
+function setFY(fy) {
+  currentFY = fy;
+  document.querySelectorAll('.fy-btn').forEach(b=>b.classList.toggle('active', b.dataset.fy===fy));
+  renderTables();
+}
+
+function buildFYSelector() {
+  const sel = document.getElementById('fy-selector');
+  sel.innerHTML = '';
+  FY_LIST.forEach(fy => {
+    const btn = document.createElement('button');
+    btn.className = 'fy-btn'+(fy===currentFY?' active':'');
+    btn.textContent = fy;
+    btn.dataset.fy = fy;
+    btn.onclick = () => setFY(fy);
+    sel.appendChild(btn);
+  });
+}
+
+function renderTables() {
+  const d = ALL_DATA[currentFY];
+  if (!d) {
+    document.getElementById('table1-container').innerHTML = '<div class="no-data">No data</div>';
+    document.getElementById('table2-container').innerHTML = '<div class="no-data">No data</div>';
+    return;
+  }
+
+  const totalBilled = last(d.abiMainBilled)+last(d.abiPresBilled)+last(d.nonMainBilled)+last(d.nonPresBilled);
+  const totalCash   = last(d.abiMainCash)+last(d.abiPresCash)+last(d.nonMainCash)+last(d.nonPresCash);
+
+  // ── TABLE 1: Cumulative Cash & Revenue ──────────────────────────────────────
+  let t1 = `<table>
+    <thead>
+      <tr>
+        <th rowspan="2">Closure Month</th>
+        <th colspan="2" class="pillar-header">ABI Mainstream</th>
+        <th colspan="2" class="pillar-header">ABI Prestige</th>
+        <th colspan="2" class="pillar-header">Non-ABI Mainstream</th>
+        <th colspan="2" class="pillar-header">Non-ABI Prestige</th>
+        <th colspan="2" class="pillar-header">Total</th>
+      </tr>
+      <tr>
+        <th>Cash</th><th class="pillar-group">Revenue</th>
+        <th>Cash</th><th class="pillar-group">Revenue</th>
+        <th>Cash</th><th class="pillar-group">Revenue</th>
+        <th>Cash</th><th class="pillar-group">Revenue</th>
+        <th>Cash</th><th>Revenue</th>
+      </tr>
+    </thead>
+    <tbody>`;
+
+  d.months.forEach((m, i) => {
+    const totC = d.abiMainCash[i]+d.abiPresCash[i]+d.nonMainCash[i]+d.nonPresCash[i];
+    const totB = d.abiMainBilled[i]+d.abiPresBilled[i]+d.nonMainBilled[i]+d.nonPresBilled[i];
+    t1 += `<tr>
+      <td>${m}</td>
+      <td>${fmt(d.abiMainCash[i])}</td><td class="pillar-group">${fmt(d.abiMainBilled[i])}</td>
+      <td>${fmt(d.abiPresCash[i])}</td><td class="pillar-group">${fmt(d.abiPresBilled[i])}</td>
+      <td>${fmt(d.nonMainCash[i])}</td><td class="pillar-group">${fmt(d.nonMainBilled[i])}</td>
+      <td>${fmt(d.nonPresCash[i])}</td><td class="pillar-group">${fmt(d.nonPresBilled[i])}</td>
+      <td>${fmt(totC)}</td><td>${fmt(totB)}</td>
+    </tr>`;
+  });
+
+  t1 += `<tr class="total-row">
+    <td>Total</td>
+    <td>${fmt(last(d.abiMainCash))}</td><td class="pillar-group">${fmt(last(d.abiMainBilled))}</td>
+    <td>${fmt(last(d.abiPresCash))}</td><td class="pillar-group">${fmt(last(d.abiPresBilled))}</td>
+    <td>${fmt(last(d.nonMainCash))}</td><td class="pillar-group">${fmt(last(d.nonMainBilled))}</td>
+    <td>${fmt(last(d.nonPresCash))}</td><td class="pillar-group">${fmt(last(d.nonPresBilled))}</td>
+    <td>${fmt(totalCash)}</td><td>${fmt(totalBilled)}</td>
+  </tr>`;
+  t1 += `</tbody></table>`;
+  document.getElementById('table1-container').innerHTML = t1;
+
+  // ── TABLE 2: Performance, Target & Collection % ──────────────────────────────
+  const totalABIMainBilled = last(d.abiMainBilled);
+  const totalABIPresBilled = last(d.abiPresBilled);
+  const totalNonMainBilled = last(d.nonMainBilled);
+  const totalNonPresBilled = last(d.nonPresBilled);
+  const totalAllBilled     = totalBilled;
+
+  let t2 = `<table>
+    <thead>
+      <tr>
+        <th rowspan="2">Closure Month</th>
+        <th colspan="3" class="pillar-header">ABI Mainstream</th>
+        <th colspan="3" class="pillar-header">ABI Prestige</th>
+        <th colspan="3" class="pillar-header">Non-ABI Mainstream</th>
+        <th colspan="3" class="pillar-header">Non-ABI Prestige</th>
+        <th colspan="3" class="pillar-header">Total</th>
+      </tr>
+      <tr>
+        <th>Perf %</th><th>Target</th><th class="pillar-group">Collection</th>
+        <th>Perf %</th><th>Target</th><th class="pillar-group">Collection</th>
+        <th>Perf %</th><th>Target</th><th class="pillar-group">Collection</th>
+        <th>Perf %</th><th>Target</th><th class="pillar-group">Collection</th>
+        <th>Perf %</th><th>Target</th><th>Collection</th>
+      </tr>
+    </thead>
+    <tbody>`;
+
+  d.months.forEach((m, i) => {
+    const amPerf = d.abiMainBilled[i]>0 ? d.abiMainCash[i]/d.abiMainBilled[i] : null;
+    const apPerf = d.abiPresBilled[i]>0 ? d.abiPresCash[i]/d.abiPresBilled[i] : null;
+    const nmPerf = d.nonMainBilled[i]>0  ? d.nonMainCash[i]/d.nonMainBilled[i] : null;
+    const npPerf = d.nonPresBilled[i]>0  ? d.nonPresCash[i]/d.nonPresBilled[i] : null;
+    const totB   = d.abiMainBilled[i]+d.abiPresBilled[i]+d.nonMainBilled[i]+d.nonPresBilled[i];
+    const totC   = d.abiMainCash[i]+d.abiPresCash[i]+d.nonMainCash[i]+d.nonPresCash[i];
+    const totPerf = totB>0 ? totC/totB : null;
+
+    const amColl = totalABIMainBilled>0 ? d.abiMainBilled[i]/totalABIMainBilled : 0;
+    const apColl = totalABIPresBilled>0 ? d.abiPresBilled[i]/totalABIPresBilled : 0;
+    const nmColl = totalNonMainBilled>0 ? d.nonMainBilled[i]/totalNonMainBilled : 0;
+    const npColl = totalNonPresBilled>0 ? d.nonPresBilled[i]/totalNonPresBilled : 0;
+    const totColl = totalAllBilled>0 ? totB/totalAllBilled : 0;
+
+    const perfClass = (p, t) => p===null?'': p>=t?'pos':'neg';
+
+    t2 += `<tr>
+      <td>${m}</td>
+      <td class="${perfClass(amPerf,d.abiMainTarget)}">${fmtPct(amPerf)}</td><td>${fmtPct(d.abiMainTarget)}</td><td class="pillar-group">${fmtPct(amColl)}</td>
+      <td class="${perfClass(apPerf,d.abiPresTarget)}">${fmtPct(apPerf)}</td><td>${fmtPct(d.abiPresTarget)}</td><td class="pillar-group">${fmtPct(apColl)}</td>
+      <td class="${perfClass(nmPerf,d.nonMainTarget)}">${fmtPct(nmPerf)}</td><td>${fmtPct(d.nonMainTarget)}</td><td class="pillar-group">${fmtPct(nmColl)}</td>
+      <td class="${perfClass(npPerf,d.nonPresTarget)}">${fmtPct(npPerf)}</td><td>${fmtPct(d.nonPresTarget)}</td><td class="pillar-group">${fmtPct(npColl)}</td>
+      <td class="${perfClass(totPerf,(d.abiMainTarget+d.abiPresTarget+d.nonMainTarget+d.nonPresTarget)/4)}">${fmtPct(totPerf)}</td>
+      <td>${fmtPct((d.abiMainTarget+d.abiPresTarget+d.nonMainTarget+d.nonPresTarget)/4)}</td>
+      <td>${fmtPct(totColl)}</td>
+    </tr>`;
+  });
+
+  // Total row
+  const amPerfT = last(d.abiMainBilled)>0 ? last(d.abiMainCash)/last(d.abiMainBilled) : null;
+  const apPerfT = last(d.abiPresBilled)>0 ? last(d.abiPresCash)/last(d.abiPresBilled) : null;
+  const nmPerfT = last(d.nonMainBilled)>0  ? last(d.nonMainCash)/last(d.nonMainBilled) : null;
+  const npPerfT = last(d.nonPresBilled)>0  ? last(d.nonPresCash)/last(d.nonPresBilled) : null;
+  const totPerfT = totalBilled>0 ? totalCash/totalBilled : null;
+  const perfClass = (p, t) => p===null?'': p>=t?'pos':'neg';
+
+  t2 += `<tr class="total-row">
+    <td>Total</td>
+    <td class="${perfClass(amPerfT,d.abiMainTarget)}">${fmtPct(amPerfT)}</td><td>${fmtPct(d.abiMainTarget)}</td><td class="pillar-group">100.0%</td>
+    <td class="${perfClass(apPerfT,d.abiPresTarget)}">${fmtPct(apPerfT)}</td><td>${fmtPct(d.abiPresTarget)}</td><td class="pillar-group">100.0%</td>
+    <td class="${perfClass(nmPerfT,d.nonMainTarget)}">${fmtPct(nmPerfT)}</td><td>${fmtPct(d.nonMainTarget)}</td><td class="pillar-group">100.0%</td>
+    <td class="${perfClass(npPerfT,d.nonPresTarget)}">${fmtPct(npPerfT)}</td><td>${fmtPct(d.nonPresTarget)}</td><td class="pillar-group">100.0%</td>
+    <td class="${perfClass(totPerfT,(d.abiMainTarget+d.abiPresTarget+d.nonMainTarget+d.nonPresTarget)/4)}">${fmtPct(totPerfT)}</td>
+    <td>${fmtPct((d.abiMainTarget+d.abiPresTarget+d.nonMainTarget+d.nonPresTarget)/4)}</td>
+    <td>100.0%</td>
+  </tr>`;
+  t2 += `</tbody></table>`;
+  document.getElementById('table2-container').innerHTML = t2;
+}
+
+function render() {
+  ALL_DATA = getParams();
+  FY_LIST = Object.keys(ALL_DATA).sort();
+  if (!FY_LIST.length) {
+    document.getElementById('table1-container').innerHTML = '<div class="no-data">Waiting for data...</div>';
+    document.getElementById('table2-container').innerHTML = '<div class="no-data">Waiting for data...</div>';
+    return;
+  }
+  currentFY = FY_LIST[FY_LIST.length-1];
+  buildFYSelector();
+  renderTables();
+}
+
+render();
+</script>
+</body>
+</html>
