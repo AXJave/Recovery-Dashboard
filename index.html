@@ -225,8 +225,7 @@
     <div class="chart-title">
       <span>Cumulative Billed vs Collected</span>
       <div class="legend">
-        <div class="legend-item"><div class="legend-swatch" style="background:#d0d0d0"></div>Billed</div>
-        <div class="legend-item"><div class="legend-swatch" style="background:rgba(174,235,89,0.9)"></div>Collected</div>
+        <div class="legend-item"><div class="legend-swatch" style="background:rgba(174,235,89,0.9)"></div>Collection %</div>
         <div class="legend-item"><div class="legend-line" style="border-color:#FF7F00"></div>Target</div>
         <div class="legend-item"><div class="legend-line" style="border-color:#242424"></div>Performance</div>
       </div>
@@ -257,18 +256,22 @@ function getParams() {
     if (!months.length) return null;
     return {
       months,
-      abiMainBilled: parseSeries(get('amb'+suffix,null), months),
-      abiMainCash:   parseSeries(get('amc'+suffix,null), months),
-      abiMainTarget: parseFloat(get('amt'+suffix,'0.74')),
-      abiPresBilled: parseSeries(get('apb'+suffix,null), months),
-      abiPresCash:   parseSeries(get('apc'+suffix,null), months),
-      abiPresTarget: parseFloat(get('apt'+suffix,'0.78')),
-      nonMainBilled: parseSeries(get('nmb'+suffix,null), months),
-      nonMainCash:   parseSeries(get('nmc'+suffix,null), months),
-      nonMainTarget: parseFloat(get('nmt'+suffix,'0.65')),
-      nonPresBilled: parseSeries(get('npb'+suffix,null), months),
-      nonPresCash:   parseSeries(get('npc'+suffix,null), months),
-      nonPresTarget: parseFloat(get('npt'+suffix,'0.63')),
+      abiMainBilled:   parseSeries(get('amb'+suffix,null), months),
+      abiMainCash:     parseSeries(get('amc'+suffix,null), months),
+      abiMainTarget:   parseFloat(get('amt'+suffix,'0.74')),
+      abiMainMonthly:  parseSeries(get('amm'+suffix,null), months),
+      abiPresBilled:   parseSeries(get('apb'+suffix,null), months),
+      abiPresCash:     parseSeries(get('apc'+suffix,null), months),
+      abiPresTarget:   parseFloat(get('apt'+suffix,'0.78')),
+      abiPresMonthly:  parseSeries(get('apm'+suffix,null), months),
+      nonMainBilled:   parseSeries(get('nmb'+suffix,null), months),
+      nonMainCash:     parseSeries(get('nmc'+suffix,null), months),
+      nonMainTarget:   parseFloat(get('nmt'+suffix,'0.65')),
+      nonMainMonthly:  parseSeries(get('nmm'+suffix,null), months),
+      nonPresBilled:   parseSeries(get('npb'+suffix,null), months),
+      nonPresCash:     parseSeries(get('npc'+suffix,null), months),
+      nonPresTarget:   parseFloat(get('npt'+suffix,'0.63')),
+      nonPresMonthly:  parseSeries(get('npm'+suffix,null), months),
     };
   };
 
@@ -295,14 +298,15 @@ function last(arr) { return arr&&arr.length ? arr[arr.length-1] : 0; }
 
 function getFilterData(d, filter) {
   switch(filter) {
-    case 'abiMain': return { billed:d.abiMainBilled, cash:d.abiMainCash, target:d.abiMainTarget };
-    case 'abiPres': return { billed:d.abiPresBilled, cash:d.abiPresCash, target:d.abiPresTarget };
-    case 'nonMain': return { billed:d.nonMainBilled, cash:d.nonMainCash, target:d.nonMainTarget };
-    case 'nonPres': return { billed:d.nonPresBilled, cash:d.nonPresCash, target:d.nonPresTarget };
+    case 'abiMain': return { billed:d.abiMainBilled, cash:d.abiMainCash, target:d.abiMainTarget, monthlyBilled:d.abiMainMonthly };
+    case 'abiPres': return { billed:d.abiPresBilled, cash:d.abiPresCash, target:d.abiPresTarget, monthlyBilled:d.abiPresMonthly };
+    case 'nonMain': return { billed:d.nonMainBilled, cash:d.nonMainCash, target:d.nonMainTarget, monthlyBilled:d.nonMainMonthly };
+    case 'nonPres': return { billed:d.nonPresBilled, cash:d.nonPresCash, target:d.nonPresTarget, monthlyBilled:d.nonPresMonthly };
     default: return {
       billed: d.abiMainBilled.map((_,i)=>d.abiMainBilled[i]+d.abiPresBilled[i]+d.nonMainBilled[i]+d.nonPresBilled[i]),
       cash:   d.abiMainCash.map((_,i)=>d.abiMainCash[i]+d.abiPresCash[i]+d.nonMainCash[i]+d.nonPresCash[i]),
-      target: (d.abiMainTarget+d.abiPresTarget+d.nonMainTarget+d.nonPresTarget)/4
+      target: (d.abiMainTarget+d.abiPresTarget+d.nonMainTarget+d.nonPresTarget)/4,
+      monthlyBilled: d.abiMainMonthly.map((_,i)=>d.abiMainMonthly[i]+d.abiPresMonthly[i]+d.nonMainMonthly[i]+d.nonPresMonthly[i])
     };
   }
 }
@@ -354,6 +358,10 @@ function updateChart() {
     `<span class="${isAbove?'pos':'neg'}">${isAbove?'▲':'▼'} ${(Math.abs(variance)*100).toFixed(1)}%</span> vs Target`;
   document.getElementById('kpi-perf-card').className = 'kpi '+(isAbove?'above':'below');
 
+  // Calculate monthly collection % = monthly billed / total FY billed
+  const totalBilledFY = last(f.billed);
+  const monthlyBilled = f.monthlyBilled || [];
+  const collectionPct = monthlyBilled.map(v => totalBilledFY > 0 ? v / totalBilledFY : 0);
   const perfLine   = f.billed.map((b,i)=>b>0?f.cash[i]/b:null);
   const validPerf  = perfLine.filter(v => v !== null && !isNaN(v) && isFinite(v));
   const maxPerf    = validPerf.length ? Math.max(...validPerf) : 1;
@@ -367,14 +375,13 @@ function updateChart() {
 
   if (chartInstance) {
     chartInstance.data.labels = d.months;
-    chartInstance.data.datasets[0].data = f.billed;
-    chartInstance.data.datasets[1].data = f.cash;
-    chartInstance.data.datasets[2].data = targetLine;
-    chartInstance.data.datasets[3].data = perfLine;
+    chartInstance.data.datasets[0].data = collectionPct;
+    chartInstance.data.datasets[1].data = targetLine;
+    chartInstance.data.datasets[2].data = perfLine;
     chartInstance.options.scales.yRate.max = yRateMax;
     chartInstance.options.scales.yRate.min = yRateMin;
     chartInstance.options.scales.yRate.ticks.stepSize = yRateStep;
-    chartInstance.options.scales.yAmount.min = 0;
+    chartInstance.options.scales.yCollection.min = 0;
     chartInstance.update();
   } else {
     const canvas = document.getElementById('mainChart');
@@ -385,10 +392,9 @@ function updateChart() {
       data: {
         labels: d.months,
         datasets: [
-          { type:'bar',  label:'Total Billed',   data:f.billed,   backgroundColor:'#d0d0d0', order:3, yAxisID:'yAmount', barPercentage:0.8, categoryPercentage:0.85 },
-          { type:'bar',  label:'Cash Collected', data:f.cash,     backgroundColor:'rgba(174,235,89,0.9)', order:2, yAxisID:'yAmount', barPercentage:0.8, categoryPercentage:0.85 },
-          { type:'line', label:'Target',         data:targetLine, borderColor:'#FF7F00', borderDash:[5,3], borderWidth:1.5, pointRadius:0, order:0, yAxisID:'yRate', tension:0 },
-          { type:'line', label:'Performance',    data:perfLine,   borderColor:'#242424', borderWidth:1.5, pointRadius:2, pointBackgroundColor:'#242424', pointBorderColor:'#F7F7F7', pointBorderWidth:1, order:1, yAxisID:'yRate', tension:0.3, spanGaps:false }
+          { type:'bar',  label:'Collection %',  data:collectionPct, backgroundColor:'rgba(174,235,89,0.9)', order:2, yAxisID:'yCollection', barPercentage:0.8, categoryPercentage:0.85 },
+          { type:'line', label:'Target',         data:targetLine,    borderColor:'#FF7F00', borderDash:[5,3], borderWidth:1.5, pointRadius:0, order:0, yAxisID:'yRate', tension:0 },
+          { type:'line', label:'Performance',    data:perfLine,      borderColor:'#242424', borderWidth:1.5, pointRadius:2, pointBackgroundColor:'#242424', pointBorderColor:'#F7F7F7', pointBorderWidth:1, order:1, yAxisID:'yRate', tension:0.3, spanGaps:false }
         ]
       },
       options: {
@@ -408,7 +414,7 @@ function updateChart() {
         },
         scales:{
           x:{grid:{color:'#ebebeb'},ticks:{color:'#999',font:{family:'Inter',size:9}},border:{color:'#e0e0e0'}},
-          yAmount:{position:'right',min:0,grid:{display:false},ticks:{color:'#999',font:{family:'Inter',size:9},callback:v=>fmt(v)},border:{color:'#e0e0e0'}},
+          yCollection:{position:'right',min:0,grid:{display:false},ticks:{color:'#999',font:{family:'Inter',size:9},callback:v=>(v*100).toFixed(1)+'%'},border:{color:'#e0e0e0'}},
           yRate:{position:'left',min:yRateMin,max:yRateMax,grid:{color:'#ebebeb'},ticks:{stepSize:yRateStep,color:'#999',font:{family:'Inter',size:9},callback:v=>Math.round(v*100)+'%'},border:{color:'#e0e0e0'}}
         }
       }
