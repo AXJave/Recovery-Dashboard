@@ -360,8 +360,8 @@ function updateChart() {
   const minPerf    = validPerf.length ? Math.min(...validPerf) : 0.6;
   const maxVal     = Math.max(maxPerf, f.target);
   const minVal     = Math.min(minPerf, f.target);
-  const yRateMax   = (Math.ceil(maxVal * 10) + 2) / 10;
-  const yRateMin   = Math.max(0, (Math.floor(minVal * 10) - 2) / 10);
+  const yRateMax   = (Math.floor(maxVal * 10) + 2) / 10;
+  const yRateMin   = Math.max(0, (Math.ceil(minVal * 10) - 2) / 10);
   const yRateStep  = 0.1;
   const targetLine = d.months.map(()=>f.target);
 
