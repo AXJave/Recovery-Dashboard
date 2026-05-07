@@ -25,25 +25,37 @@
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
-  html, body {
+  html { height: 100%; overflow: hidden; }
+
+  body {
     background: var(--bg);
     color: var(--text-primary);
     font-family: var(--font);
     font-size: 11px;
     padding: 10px;
-    overflow-y: auto;
-    overflow-x: hidden;
+    height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
   }
 
-  .dashboard { width: 100%; }
+  .dashboard {
+    width: 100%;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+  }
 
   .top-bar {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     gap: 8px;
     flex-wrap: wrap;
+    flex-shrink: 0;
   }
 
   .brand { display: flex; align-items: center; gap: 8px; }
@@ -94,7 +106,7 @@
 
   .fy-btn:hover:not(.active) { border-color: var(--collected); color: var(--text-primary); }
 
-  .filter-bar { display: flex; gap: 4px; margin-bottom: 10px; flex-wrap: wrap; }
+  .filter-bar { display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; flex-shrink: 0; }
 
   .filter-btn {
     background: var(--surface);
@@ -119,7 +131,7 @@
 
   .filter-btn:hover:not(.active) { border-color: var(--collected); color: var(--text-primary); }
 
-  .kpi-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; margin-bottom: 10px; }
+  .kpi-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; margin-bottom: 8px; flex-shrink: 0; }
 
   .kpi {
     background: var(--surface);
@@ -139,8 +151,8 @@
   .pos { color: var(--perf-above); }
   .neg { color: var(--perf-below); }
 
-  .chart-container { background: var(--surface); border: 1px solid var(--border); padding: 10px; margin-bottom: 10px; }
-  .chart-wrapper { position: relative; height: 160px; width: 100%; }
+  .chart-container { background: var(--surface); border: 1px solid var(--border); padding: 10px; margin-bottom: 8px; flex-shrink: 0; }
+  .chart-wrapper { position: relative; height: 160px; width: 100%; flex-shrink: 0; }
 
   .chart-title {
     font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px;
@@ -155,7 +167,7 @@
 
   canvas { width: 100% !important; display: block; }
 
-  .pillar-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 6px; }
+  .pillar-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 6px; flex-shrink: 0; }
 
   .pillar-card { background: var(--surface); border: 1px solid var(--border); padding: 10px 12px; }
 
@@ -367,7 +379,16 @@ function updateChart() {
   const perfLine   = f.billed.map((b,i)=>b>0?f.cash[i]/b:null);
   const targetLine = d.months.map(()=>f.target);
 
-  if (chartInstance) chartInstance.destroy();
+  if (chartInstance) {
+    // Update existing chart data without destroying — prevents any resize
+    chartInstance.data.labels = d.months;
+    chartInstance.data.datasets[0].data = f.billed;
+    chartInstance.data.datasets[1].data = f.cash;
+    chartInstance.data.datasets[2].data = targetLine;
+    chartInstance.data.datasets[3].data = perfLine;
+    chartInstance.options.scales.yRate.max = 1;
+    chartInstance.update('none');
+  } else {
   const canvas = document.getElementById('mainChart');
   canvas.width  = canvas.parentElement.offsetWidth;
   canvas.height = 160;
@@ -404,6 +425,7 @@ function updateChart() {
       }
     }
   });
+  }
 
   const pillars = [
     {label:'ABI Mainstream',     billed:d.abiMainBilled, cash:d.abiMainCash, target:d.abiMainTarget},
