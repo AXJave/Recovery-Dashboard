@@ -210,8 +210,8 @@ function updateChart() {
     `<span class="${isAbove?'pos':'neg'}">${isAbove?'▲':'▼'} ${(Math.abs(variance)*100).toFixed(1)}%</span> vs Target`;
   document.getElementById('kpi-perf-card').className = 'kpi '+(isAbove?'above':'below');
 
-  // Collection % bar = cumulative billed / total FY billed (curves upward 0->100%)
-  const collectionPct = f.billed.map(v => totalBilled > 0 ? v / totalBilled : 0);
+  // Collection % bar = cumulative cash / total FY billed (how much of the pot has been recovered)
+  const collectionPct = f.cash.map(v => totalBilled > 0 ? v / totalBilled : 0);
 
   // Performance line = cumulative cash / cumulative billed
   const perfLine  = f.billed.map((b,i) => b > 0 ? f.cash[i] / b : null);
