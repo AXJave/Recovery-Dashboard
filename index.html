@@ -114,19 +114,15 @@ function getParams() {
       months,
       abiMainBilled:  parseSeries(get('amb'+suffix,null), months),
       abiMainCash:    parseSeries(get('amc'+suffix,null), months),
-      abiMainRev:     parseSeries(get('amr'+suffix,null), months),
       abiMainTarget:  parseFloat(get('amt'+suffix,'0.74')),
       abiPresBilled:  parseSeries(get('apb'+suffix,null), months),
       abiPresCash:    parseSeries(get('apc'+suffix,null), months),
-      abiPresRev:     parseSeries(get('apr'+suffix,null), months),
       abiPresTarget:  parseFloat(get('apt'+suffix,'0.78')),
       nonMainBilled:  parseSeries(get('nmb'+suffix,null), months),
       nonMainCash:    parseSeries(get('nmc'+suffix,null), months),
-      nonMainRev:     parseSeries(get('nmr'+suffix,null), months),
       nonMainTarget:  parseFloat(get('nmt'+suffix,'0.65')),
       nonPresBilled:  parseSeries(get('npb'+suffix,null), months),
       nonPresCash:    parseSeries(get('npc'+suffix,null), months),
-      nonPresRev:     parseSeries(get('npr'+suffix,null), months),
       nonPresTarget:  parseFloat(get('npt'+suffix,'0.63')),
     };
   };
@@ -153,14 +149,13 @@ function last(arr) { return arr&&arr.length ? arr[arr.length-1] : 0; }
 
 function getFilterData(d, filter) {
   switch(filter) {
-    case 'abiMain': return { billed:d.abiMainBilled, cash:d.abiMainCash, rev:d.abiMainRev, target:d.abiMainTarget };
-    case 'abiPres': return { billed:d.abiPresBilled, cash:d.abiPresCash, rev:d.abiPresRev, target:d.abiPresTarget };
-    case 'nonMain': return { billed:d.nonMainBilled, cash:d.nonMainCash, rev:d.nonMainRev, target:d.nonMainTarget };
-    case 'nonPres': return { billed:d.nonPresBilled, cash:d.nonPresCash, rev:d.nonPresRev, target:d.nonPresTarget };
+    case 'abiMain': return { billed:d.abiMainBilled, cash:d.abiMainCash, target:d.abiMainTarget };
+    case 'abiPres': return { billed:d.abiPresBilled, cash:d.abiPresCash, target:d.abiPresTarget };
+    case 'nonMain': return { billed:d.nonMainBilled, cash:d.nonMainCash, target:d.nonMainTarget };
+    case 'nonPres': return { billed:d.nonPresBilled, cash:d.nonPresCash, target:d.nonPresTarget };
     default: return {
       billed: d.abiMainBilled.map((_,i)=>d.abiMainBilled[i]+d.abiPresBilled[i]+d.nonMainBilled[i]+d.nonPresBilled[i]),
       cash:   d.abiMainCash.map((_,i)=>d.abiMainCash[i]+d.abiPresCash[i]+d.nonMainCash[i]+d.nonPresCash[i]),
-      rev:    d.abiMainRev.map((_,i)=>d.abiMainRev[i]+d.abiPresRev[i]+d.nonMainRev[i]+d.nonPresRev[i]),
       target: (d.abiMainTarget+d.abiPresTarget+d.nonMainTarget+d.nonPresTarget)/4
     };
   }
@@ -219,7 +214,7 @@ function updateChart() {
   const collectionPct = f.cash.map(v => totalBilled > 0 ? v / totalBilled : 0);
 
   // Performance line = cumulative cash / cumulative RawABIRevenue (both from NetHireUR)
-  const perfLine  = f.rev.map((r,i) => r > 0 ? f.cash[i] / r : null);
+  const perfLine  = f.billed.map((b,i) => b > 0 ? f.cash[i] / b : null);
   const targetLine = d.months.map(() => f.target);
 
   // Dynamic axis for performance/target lines
