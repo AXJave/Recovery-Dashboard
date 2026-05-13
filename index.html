@@ -214,17 +214,7 @@ function updateChart() {
   const collectionPct = f.cash.map(v => totalBilled > 0 ? v / totalBilled : 0);
 
   // Performance line = cumulative cash / cumulative RawABIRevenue (both from NetHireUR)
-  const perfLine = f.billed.map((_, i) => {
-  let cashToDate = 0;
-  let revToDate = 0;
-
-  for (let j = 0; j <= i; j++) {
-    cashToDate += (f.cash[j] || 0);
-    revToDate += (f.billed[j] || 0);
-  }
-
-  return revToDate > 0 ? cashToDate / revToDate : null;
-});
+  const perfLine  = f.billed.map((b,i) => b > 0 ? f.cash[i] / b : null);
   const targetLine = d.months.map(() => f.target);
 
   // Dynamic axis for performance/target lines
