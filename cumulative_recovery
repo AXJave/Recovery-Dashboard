@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cumulative Recovery</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+  :root { --bg:#F7F7F7; --surface:#fff; --border:#e0e0e0; --text:#242424; --muted:#999; --font:'Inter',sans-serif; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text); font-family:var(--font); font-size:11px; padding:10px; overflow-y:auto; }
+  .table-wrap { overflow-x:auto; }
+  table { border-collapse:collapse; font-size:10px; white-space:nowrap; width:100%; }
+  th { background:#242424; color:#fff; padding:5px 8px; text-align:center; font-weight:600; font-size:9px; letter-spacing:0.5px; border-right:1px solid #333; }
+  th.left { text-align:left; }
+  th.group { background:#333; border-bottom:1px solid #555; }
+  td { padding:4px 8px; text-align:right; border-right:1px solid var(--border); border-bottom:1px solid var(--border); }
+  td.label { text-align:left; font-weight:600; background:#f5f5f5; border-right:2px solid var(--border); }
+  td.year { text-align:left; font-weight:700; background:#efefef; border-right:1px solid var(--border); }
+  td.target { font-weight:600; }
+  td.billed { font-weight:500; }
+  tr:hover td { filter:brightness(0.97); }
+  .no-data { text-align:center; padding:40px; color:var(--muted); font-size:11px; text-transform:uppercase; }
+</style>
+</head>
+<body>
+<div class="table-wrap">
+  <div id="table-container"></div>
+</div>
+<script>
+function getParams() {
+  const p = new URLSearchParams(window.location.search);
+  const get = (k, fb) => { const v = p.get(k); return (v !== null && v !== '' && v !== 'null') ? v : fb; };
+  const parseSnaps = (raw) => {
+    if (!raw) return Array(10).fill(null);
+    return raw.split('|').map(v => { const n = parseFloat(v); return isNaN(n) ? null : n; });
+  };
+  const result = [];
+  const fyKeys = [];
+  const primary = get('fy', null);
+  if (primary) fyKeys.push({ fy: primary, suffix: '' });
+  [2,3,4,5,6,7,8,9,10].forEach(i => {
+    const fy = get('fy'+i, null);
+    if (fy) fyKeys.push({ fy, suffix: ''+i });
+  });
+  fyKeys.sort((a,b) => b.fy.localeCompare(a.fy));
+  fyKeys.forEach(({ fy, suffix: s }) => {
+    const amt  = parseFloat(get('amt'+s,'0'));
+    const apt  = parseFloat(get('apt'+s,'0'));
+    const nmt  = parseFloat(get('nmt'+s,'0'));
+    const npt  = parseFloat(get('npt'+s,'0'));
+    const ambt = (parseFloat(get('ambt'+s,'0'))||0)*1000;
+    const apbt = (parseFloat(get('apbt'+s,'0'))||0)*1000;
+    const nmbt = (parseFloat(get('nmbt'+s,'0'))||0)*1000;
+    const npbt = (parseFloat(get('npbt'+s,'0'))||0)*1000;
+    const amSnaps = parseSnaps(get('ams'+s,null));
+    const apSnaps = parseSnaps(get('aps'+s,null));
+    const nmSnaps = parseSnaps(get('nms'+s,null));
+    const npSnaps = parseSnaps(get('nps'+s,null));
+    result.push(
+      { fy, pillar:'ABI Mainstream',     target:amt,  billed:ambt, snaps:amSnaps },
+      { fy, pillar:'ABI Prestige',        target:apt,  billed:apbt, snaps:apSnaps },
+      { fy, pillar:'NABI Mainstream',     target:nmt,  billed:nmbt, snaps:nmSnaps },
+      { fy, pillar:'NABI Prestige',       target:npt,  billed:npbt, snaps:npSnaps }
+    );
+  });
+  return result;
+}
+
+function fmt(n) {
+  if (!n || isNaN(n)) return '—';
+  if (n>=1000000) return (n/1000000).toFixed(2)+'M';
+  if (n>=1000) return (n/1000).toFixed(0)+'K';
+  return Math.round(n).toLocaleString();
+}
+function fmtPct(n) { if(n===null||isNaN(n)||!isFinite(n)) return ''; return (n*100).toFixed(1)+'%'; }
+
+function cellColor(perf, target) {
+  if (perf === null || !target) return '';
+  const diff = perf - target;
+  const intensity = Math.min(Math.abs(diff) / 0.1, 1);
+  if (diff >= 0) {
+    const g = Math.round(200 + 55 * intensity);
+    const rb = Math.round(200 - 100 * intensity);
+    return `background:rgb(${rb},${g},${rb})`;
+  } else {
+    const r = Math.round(200 + 55 * intensity);
+    const gb = Math.round(200 - 100 * intensity);
+    return `background:rgb(${r},${gb},${gb})`;
+  }
+}
+
+function render() {
+  const data = getParams();
+  if (!data.length) {
+    document.getElementById('table-container').innerHTML = '<div class="no-data">Waiting for data...</div>';
+    return;
+  }
+
+  const intervals = [3,6,9,12,15,18,24,36,48,60];
+
+  let html = `<table>
+    <thead>
+      <tr>
+        <th class="left" rowspan="2">Year</th>
+        <th class="left" rowspan="2">Cumulative Recovery</th>
+        <th rowspan="2">Target</th>
+        <th rowspan="2">Total Billed</th>
+        <th colspan="${intervals.length}" class="group">Period after year end (months)</th>
+      </tr>
+      <tr>
+        ${intervals.map(i=>`<th>${i}</th>`).join('')}
+      </tr>
+    </thead>
+    <tbody>`;
+
+  data.forEach(row => {
+    const snaps = row.snaps.map(s => s !== null ? s / (row.billed || 1) : null);
+    html += `<tr>
+      <td class="year">${row.fy}</td>
+      <td class="label">${row.pillar}</td>
+      <td class="target">${fmtPct(row.target)}</td>
+      <td class="billed">${fmt(row.billed)}</td>
+      ${snaps.map(s => {
+        const style = s !== null ? cellColor(s, row.target) : '';
+        return `<td ${style ? `style="${style}"` : ''}>${fmtPct(s)}</td>`;
+      }).join('')}
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+  document.getElementById('table-container').innerHTML = html;
+}
+
+render();
+</script>
+</body>
+</html>
