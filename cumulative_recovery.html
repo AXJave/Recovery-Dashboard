@@ -33,7 +33,7 @@ function getParams() {
   const get = (k, fb) => { const v = p.get(k); return (v !== null && v !== '' && v !== 'null') ? v : fb; };
   const parseSnaps = (raw) => {
     if (!raw) return Array(10).fill(null);
-    return raw.split('|').map(v => { const n = parseFloat(v); return isNaN(n) ? null : n; });
+    return raw.split('|').map(v => { const n = parseFloat(v); return isNaN(n) ? null : n * 1000; });
   };
   const result = [];
   const fyKeys = [];
