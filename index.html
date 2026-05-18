@@ -101,7 +101,6 @@ let FY_LIST = [];
 function getParams() {
   const p = new URLSearchParams(window.location.search);
   const get = (k, fb) => { const v = p.get(k); return (v !== null && v !== '' && v !== 'null') ? v : fb; };
-  // DAX passes values divided by 1000 — multiply back here
   const parseSeries = (raw, months) => {
     if (!raw) return months.map(()=>0);
     return raw.split('|').map(v=>(parseFloat(v)||0)*1000);
@@ -114,15 +113,19 @@ function getParams() {
       months,
       abiMainBilled:  parseSeries(get('amb'+suffix,null), months),
       abiMainCash:    parseSeries(get('amc'+suffix,null), months),
+      abiMainRev:     parseSeries(get('amr'+suffix,null), months),  // NEW: NetHires revenue
       abiMainTarget:  parseFloat(get('amt'+suffix,'0.74')),
       abiPresBilled:  parseSeries(get('apb'+suffix,null), months),
       abiPresCash:    parseSeries(get('apc'+suffix,null), months),
+      abiPresRev:     parseSeries(get('apr'+suffix,null), months),  // NEW
       abiPresTarget:  parseFloat(get('apt'+suffix,'0.78')),
       nonMainBilled:  parseSeries(get('nmb'+suffix,null), months),
       nonMainCash:    parseSeries(get('nmc'+suffix,null), months),
+      nonMainRev:     parseSeries(get('nmr'+suffix,null), months),  // NEW
       nonMainTarget:  parseFloat(get('nmt'+suffix,'0.65')),
       nonPresBilled:  parseSeries(get('npb'+suffix,null), months),
       nonPresCash:    parseSeries(get('npc'+suffix,null), months),
+      nonPresRev:     parseSeries(get('npr'+suffix,null), months),  // NEW
       nonPresTarget:  parseFloat(get('npt'+suffix,'0.63')),
     };
   };
@@ -149,13 +152,14 @@ function last(arr) { return arr&&arr.length ? arr[arr.length-1] : 0; }
 
 function getFilterData(d, filter) {
   switch(filter) {
-    case 'abiMain': return { billed:d.abiMainBilled, cash:d.abiMainCash, target:d.abiMainTarget };
-    case 'abiPres': return { billed:d.abiPresBilled, cash:d.abiPresCash, target:d.abiPresTarget };
-    case 'nonMain': return { billed:d.nonMainBilled, cash:d.nonMainCash, target:d.nonMainTarget };
-    case 'nonPres': return { billed:d.nonPresBilled, cash:d.nonPresCash, target:d.nonPresTarget };
+    case 'abiMain': return { billed:d.abiMainBilled, cash:d.abiMainCash, rev:d.abiMainRev, target:d.abiMainTarget };
+    case 'abiPres': return { billed:d.abiPresBilled, cash:d.abiPresCash, rev:d.abiPresRev, target:d.abiPresTarget };
+    case 'nonMain': return { billed:d.nonMainBilled, cash:d.nonMainCash, rev:d.nonMainRev, target:d.nonMainTarget };
+    case 'nonPres': return { billed:d.nonPresBilled, cash:d.nonPresCash, rev:d.nonPresRev, target:d.nonPresTarget };
     default: return {
       billed: d.abiMainBilled.map((_,i)=>d.abiMainBilled[i]+d.abiPresBilled[i]+d.nonMainBilled[i]+d.nonPresBilled[i]),
       cash:   d.abiMainCash.map((_,i)=>d.abiMainCash[i]+d.abiPresCash[i]+d.nonMainCash[i]+d.nonPresCash[i]),
+      rev:    d.abiMainRev.map((_,i)=>d.abiMainRev[i]+d.abiPresRev[i]+d.nonMainRev[i]+d.nonPresRev[i]),
       target: (d.abiMainTarget+d.abiPresTarget+d.nonMainTarget+d.nonPresTarget)/4
     };
   }
@@ -197,11 +201,12 @@ function updateChart() {
   const f = getFilterData(d, currentFilter);
   const totalBilled = last(f.billed);
   const totalCash   = last(f.cash);
-  const totalPerf   = totalBilled > 0 ? totalCash / totalBilled : 0;
+  const totalRev    = last(f.rev);
+  // Performance KPI = cash / NetHires revenue
+  const totalPerf   = totalRev > 0 ? totalCash / totalRev : 0;
   const variance    = totalPerf - f.target;
   const isAbove     = variance >= 0;
 
-  // KPI cards
   document.getElementById('kpi-billed').textContent    = fmt(totalBilled);
   document.getElementById('kpi-collected').textContent = fmt(totalCash);
   document.getElementById('kpi-perf').textContent      = fmtPct(totalPerf);
@@ -210,14 +215,13 @@ function updateChart() {
     `<span class="${isAbove?'pos':'neg'}">${isAbove?'▲':'▼'} ${(Math.abs(variance)*100).toFixed(1)}%</span> vs Target`;
   document.getElementById('kpi-perf-card').className = 'kpi '+(isAbove?'above':'below');
 
-  // Collection % bar = cumulative cash / total FY billed (how much of the pot has been recovered)
+  // Collection % bar = cumulative cash / total FY billed (month end bible)
   const collectionPct = f.cash.map(v => totalBilled > 0 ? v / totalBilled : 0);
 
-  // Performance line = cumulative cash / cumulative RawABIRevenue (both from NetHireUR)
-  const perfLine  = f.billed.map((b,i) => b > 0 ? f.cash[i] / b : null);
+  // Performance line = cumulative cash / cumulative NetHires revenue  <-- THE FIX
+  const perfLine   = f.rev.map((r,i) => r > 0 ? f.cash[i] / r : null);
   const targetLine = d.months.map(() => f.target);
 
-  // Dynamic axis for performance/target lines
   const validPerf = perfLine.filter(v => v !== null && !isNaN(v) && isFinite(v));
   const maxPerf   = validPerf.length ? Math.max(...validPerf) : 1;
   const minPerf   = validPerf.length ? Math.min(...validPerf) : 0;
@@ -227,10 +231,10 @@ function updateChart() {
   const yRateMin  = Math.max(0, (Math.floor(minVal * 10) / 10) - 0.1);
 
   if (chartInstance) {
-    chartInstance.data.labels             = d.months;
-    chartInstance.data.datasets[0].data   = collectionPct;
-    chartInstance.data.datasets[1].data   = targetLine;
-    chartInstance.data.datasets[2].data   = perfLine;
+    chartInstance.data.labels              = d.months;
+    chartInstance.data.datasets[0].data    = collectionPct;
+    chartInstance.data.datasets[1].data    = targetLine;
+    chartInstance.data.datasets[2].data    = perfLine;
     chartInstance.options.scales.yRate.max = yRateMax;
     chartInstance.options.scales.yRate.min = yRateMin;
     chartInstance.update();
@@ -271,7 +275,6 @@ function updateChart() {
             titleColor:'#999', bodyColor:'#242424',
             titleFont:{family:'Inter',size:10}, bodyFont:{family:'Inter',size:10},
             callbacks:{label(ctx){
-              if(ctx.dataset.yAxisID==='yCollection') return ` ${ctx.dataset.label}: ${fmtPct(ctx.parsed.y)}`;
               return ` ${ctx.dataset.label}: ${fmtPct(ctx.parsed.y)}`;
             }}
           }
@@ -285,18 +288,18 @@ function updateChart() {
     });
   }
 
-  // Pillar cards
+  // Pillar cards — performance = cash / NetHires revenue
   const pillars = [
-    {label:'ABI Mainstream',     billed:d.abiMainBilled, cash:d.abiMainCash, target:d.abiMainTarget},
-    {label:'ABI Prestige',       billed:d.abiPresBilled, cash:d.abiPresCash, target:d.abiPresTarget},
-    {label:'Non-ABI Mainstream', billed:d.nonMainBilled, cash:d.nonMainCash, target:d.nonMainTarget},
-    {label:'Non-ABI Prestige',   billed:d.nonPresBilled, cash:d.nonPresCash, target:d.nonPresTarget},
+    {label:'ABI Mainstream',     billed:d.abiMainBilled, cash:d.abiMainCash, rev:d.abiMainRev, target:d.abiMainTarget},
+    {label:'ABI Prestige',       billed:d.abiPresBilled, cash:d.abiPresCash, rev:d.abiPresRev, target:d.abiPresTarget},
+    {label:'Non-ABI Mainstream', billed:d.nonMainBilled, cash:d.nonMainCash, rev:d.nonMainRev, target:d.nonMainTarget},
+    {label:'Non-ABI Prestige',   billed:d.nonPresBilled, cash:d.nonPresCash, rev:d.nonPresRev, target:d.nonPresTarget},
   ];
   const grid = document.getElementById('pillar-grid');
   grid.innerHTML = '';
   pillars.forEach(p => {
-    const lb=last(p.billed), lc=last(p.cash);
-    const perf=lb>0?lc/lb:0, vari=perf-p.target, isUp=vari>=0;
+    const lb=last(p.billed), lc=last(p.cash), lr=last(p.rev);
+    const perf=lr>0?lc/lr:0, vari=perf-p.target, isUp=vari>=0;
     const card = document.createElement('div');
     card.className = 'pillar-card';
     card.innerHTML = `
