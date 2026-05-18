@@ -31,10 +31,16 @@
 function getParams() {
   const p = new URLSearchParams(window.location.search);
   const get = (k, fb) => { const v = p.get(k); return (v !== null && v !== '' && v !== 'null') ? v : fb; };
+
+  // Snaps are now pre-computed ratios * 10000 (e.g. 75.3% = 7530)
   const parseSnaps = (raw) => {
     if (!raw) return Array(10).fill(null);
-    return raw.split('|').map(v => { const n = parseFloat(v); return isNaN(n) ? null : n * 1000; });
+    return raw.split('|').map(v => {
+      const n = parseFloat(v);
+      return isNaN(n) ? null : n / 10000; // decode back to decimal e.g. 0.753
+    });
   };
+
   const result = [];
   const fyKeys = [];
   const primary = get('fy', null);
@@ -58,10 +64,10 @@ function getParams() {
     const nmSnaps = parseSnaps(get('nms'+s,null));
     const npSnaps = parseSnaps(get('nps'+s,null));
     result.push(
-      { fy, pillar:'ABI Mainstream',     target:amt,  billed:ambt, snaps:amSnaps },
-      { fy, pillar:'ABI Prestige',        target:apt,  billed:apbt, snaps:apSnaps },
-      { fy, pillar:'NABI Mainstream',     target:nmt,  billed:nmbt, snaps:nmSnaps },
-      { fy, pillar:'NABI Prestige',       target:npt,  billed:npbt, snaps:npSnaps }
+      { fy, pillar:'ABI Mainstream',  target:amt,  billed:ambt, snaps:amSnaps },
+      { fy, pillar:'ABI Prestige',    target:apt,  billed:apbt, snaps:apSnaps },
+      { fy, pillar:'NABI Mainstream', target:nmt,  billed:nmbt, snaps:nmSnaps },
+      { fy, pillar:'NABI Prestige',   target:npt,  billed:npbt, snaps:npSnaps }
     );
   });
   return result;
@@ -115,7 +121,8 @@ function render() {
     <tbody>`;
 
   data.forEach(row => {
-    const snaps = row.snaps.map(s => s !== null ? s / (row.billed || 1) : null);
+    // snaps are already cash/rev ratios — no further division needed
+    const snaps = row.snaps;
     html += `<tr>
       <td class="year">${row.fy}</td>
       <td class="label">${row.pillar}</td>
