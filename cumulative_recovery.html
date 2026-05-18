@@ -32,12 +32,15 @@ function getParams() {
   const p = new URLSearchParams(window.location.search);
   const get = (k, fb) => { const v = p.get(k); return (v !== null && v !== '' && v !== 'null') ? v : fb; };
 
-  // Snaps are now pre-computed ratios * 10000 (e.g. 75.3% = 7530)
+  // Snaps are pre-computed ratios * 10000 passed from DAX.
+  // 0 = no data yet (ISBLANK cash), null = missing param.
   const parseSnaps = (raw) => {
     if (!raw) return Array(10).fill(null);
     return raw.split('|').map(v => {
       const n = parseFloat(v);
-      return isNaN(n) ? null : n / 10000; // decode back to decimal e.g. 0.753
+      if (isNaN(n)) return null;
+      if (n === 0) return null; // 0 sentinel = no cash data yet, show blank
+      return n / 10000;         // decode to decimal e.g. 7530 -> 0.753
     });
   };
 
@@ -59,10 +62,10 @@ function getParams() {
     const apbt = (parseFloat(get('apbt'+s,'0'))||0)*1000;
     const nmbt = (parseFloat(get('nmbt'+s,'0'))||0)*1000;
     const npbt = (parseFloat(get('npbt'+s,'0'))||0)*1000;
-    const amSnaps = parseSnaps(get('ams'+s,null));
-    const apSnaps = parseSnaps(get('aps'+s,null));
-    const nmSnaps = parseSnaps(get('nms'+s,null));
-    const npSnaps = parseSnaps(get('nps'+s,null));
+    const amSnaps = parseSnaps(get('ams'+s, null));
+    const apSnaps = parseSnaps(get('aps'+s, null));
+    const nmSnaps = parseSnaps(get('nms'+s, null));
+    const npSnaps = parseSnaps(get('nps'+s, null));
     result.push(
       { fy, pillar:'ABI Mainstream',  target:amt,  billed:ambt, snaps:amSnaps },
       { fy, pillar:'ABI Prestige',    target:apt,  billed:apbt, snaps:apSnaps },
@@ -79,7 +82,10 @@ function fmt(n) {
   if (n>=1000) return (n/1000).toFixed(0)+'K';
   return Math.round(n).toLocaleString();
 }
-function fmtPct(n) { if(n===null||isNaN(n)||!isFinite(n)) return ''; return (n*100).toFixed(1)+'%'; }
+function fmtPct(n) {
+  if (n === null || n === undefined || isNaN(n) || !isFinite(n)) return '';
+  return (n * 100).toFixed(1) + '%';
+}
 
 function cellColor(perf, target) {
   if (perf === null || !target) return '';
@@ -115,13 +121,13 @@ function render() {
         <th colspan="${intervals.length}" class="group">Period after year end (months)</th>
       </tr>
       <tr>
-        ${intervals.map(i=>`<th>${i}</th>`).join('')}
+        ${intervals.map(i => `<th>${i}</th>`).join('')}
       </tr>
     </thead>
     <tbody>`;
 
   data.forEach(row => {
-    // snaps are already cash/rev ratios — no further division needed
+    // snaps are already cash/totalRevenue ratios (or null if no data)
     const snaps = row.snaps;
     html += `<tr>
       <td class="year">${row.fy}</td>
