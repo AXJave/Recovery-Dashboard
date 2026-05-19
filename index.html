@@ -7,7 +7,7 @@
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
   :root {
-    --bg: #F7F7F7; --surface: #ffffff; --surface2: #f0f0f0; --border: #e0e0e0;
+    --bg: #F7F7F7; --surface: #ffffff; --border: #e0e0e0;
     --collected: #AEEB59; --target-line: #FF7F00; --perf-above: #AEEB59; --perf-below: #F85858;
     --text-primary: #242424; --text-secondary: #666; --text-muted: #999; --font: 'Inter', sans-serif;
   }
@@ -99,12 +99,46 @@ let ALL_DATA = {};
 let FY_LIST = [];
 
 function getParams() {
-  const p = new URLSearchParams(window.location.search);
+  // Read from hash fragment (#) — no length limit unlike query string (?)
+  // Falls back to query string for backwards compatibility
+  const raw = location.hash ? location.hash.slice(1) : location.search.slice(1);
+  if (!raw) return {};
+
+  const result = {};
+
+  // New compact hash format: FY blocks separated by ^
+  // Each block: fy~months~amb~amc~apb~apc~nmb~nmc~npb~npc~amt~apt~nmt~npt
+  if (raw.indexOf('^') !== -1 || (raw.indexOf('~') !== -1 && raw.indexOf('=') === -1)) {
+    const blocks = raw.split('^').filter(b => b.length > 0);
+    blocks.forEach(block => {
+      const f = block.split('~');
+      if (f.length < 14) return;
+      const ps = s => s ? s.split('|').map(v => (parseFloat(v)||0)*1000) : [];
+      result[f[0]] = {
+        months:         f[1].split('|'),
+        abiMainBilled:  ps(f[2]),
+        abiMainCash:    ps(f[3]),
+        abiMainTarget:  parseFloat(f[10]||'0.74'),
+        abiPresBilled:  ps(f[4]),
+        abiPresCash:    ps(f[5]),
+        abiPresTarget:  parseFloat(f[11]||'0.78'),
+        nonMainBilled:  ps(f[6]),
+        nonMainCash:    ps(f[7]),
+        nonMainTarget:  parseFloat(f[12]||'0.65'),
+        nonPresBilled:  ps(f[8]),
+        nonPresCash:    ps(f[9]),
+        nonPresTarget:  parseFloat(f[13]||'0.63'),
+      };
+    });
+    return result;
+  }
+
+  // Legacy query string format (? params)
+  const p = new URLSearchParams(raw);
   const get = (k, fb) => { const v = p.get(k); return (v !== null && v !== '' && v !== 'null') ? v : fb; };
-  // DAX passes values divided by 1000 — multiply back here
-  const parseSeries = (raw, months) => {
-    if (!raw) return months.map(()=>0);
-    return raw.split('|').map(v=>(parseFloat(v)||0)*1000);
+  const parseSeries = (raw) => {
+    if (!raw) return [];
+    return raw.split('|').map(v => (parseFloat(v)||0)*1000);
   };
   const parseBlock = (suffix) => {
     const monthsRaw = get('months'+suffix, null);
@@ -112,21 +146,20 @@ function getParams() {
     if (!months.length) return null;
     return {
       months,
-      abiMainBilled:  parseSeries(get('amb'+suffix,null), months),
-      abiMainCash:    parseSeries(get('amc'+suffix,null), months),
+      abiMainBilled:  parseSeries(get('amb'+suffix,null)),
+      abiMainCash:    parseSeries(get('amc'+suffix,null)),
       abiMainTarget:  parseFloat(get('amt'+suffix,'0.74')),
-      abiPresBilled:  parseSeries(get('apb'+suffix,null), months),
-      abiPresCash:    parseSeries(get('apc'+suffix,null), months),
+      abiPresBilled:  parseSeries(get('apb'+suffix,null)),
+      abiPresCash:    parseSeries(get('apc'+suffix,null)),
       abiPresTarget:  parseFloat(get('apt'+suffix,'0.78')),
-      nonMainBilled:  parseSeries(get('nmb'+suffix,null), months),
-      nonMainCash:    parseSeries(get('nmc'+suffix,null), months),
+      nonMainBilled:  parseSeries(get('nmb'+suffix,null)),
+      nonMainCash:    parseSeries(get('nmc'+suffix,null)),
       nonMainTarget:  parseFloat(get('nmt'+suffix,'0.65')),
-      nonPresBilled:  parseSeries(get('npb'+suffix,null), months),
-      nonPresCash:    parseSeries(get('npc'+suffix,null), months),
+      nonPresBilled:  parseSeries(get('npb'+suffix,null)),
+      nonPresCash:    parseSeries(get('npc'+suffix,null)),
       nonPresTarget:  parseFloat(get('npt'+suffix,'0.63')),
     };
   };
-  const result = {};
   const primary = get('fy', null);
   const primaryData = parseBlock('');
   if (primary && primaryData) result[primary] = primaryData;
@@ -201,7 +234,6 @@ function updateChart() {
   const variance    = totalPerf - f.target;
   const isAbove     = variance >= 0;
 
-  // KPI cards
   document.getElementById('kpi-billed').textContent    = fmt(totalBilled);
   document.getElementById('kpi-collected').textContent = fmt(totalCash);
   document.getElementById('kpi-perf').textContent      = fmtPct(totalPerf);
@@ -210,14 +242,10 @@ function updateChart() {
     `<span class="${isAbove?'pos':'neg'}">${isAbove?'▲':'▼'} ${(Math.abs(variance)*100).toFixed(1)}%</span> vs Target`;
   document.getElementById('kpi-perf-card').className = 'kpi '+(isAbove?'above':'below');
 
-  // Collection % bar = cumulative cash / total FY billed (how much of the pot has been recovered)
   const collectionPct = f.cash.map(v => totalBilled > 0 ? v / totalBilled : 0);
+  const perfLine      = f.billed.map((b,i) => b > 0 ? f.cash[i] / b : null);
+  const targetLine    = d.months.map(() => f.target);
 
-  // Performance line = cumulative cash / cumulative RawABIRevenue (both from NetHireUR)
-  const perfLine  = f.billed.map((b,i) => b > 0 ? f.cash[i] / b : null);
-  const targetLine = d.months.map(() => f.target);
-
-  // Dynamic axis for performance/target lines
   const validPerf = perfLine.filter(v => v !== null && !isNaN(v) && isFinite(v));
   const maxPerf   = validPerf.length ? Math.max(...validPerf) : 1;
   const minPerf   = validPerf.length ? Math.min(...validPerf) : 0;
@@ -227,10 +255,10 @@ function updateChart() {
   const yRateMin  = Math.max(0, (Math.floor(minVal * 10) / 10) - 0.1);
 
   if (chartInstance) {
-    chartInstance.data.labels             = d.months;
-    chartInstance.data.datasets[0].data   = collectionPct;
-    chartInstance.data.datasets[1].data   = targetLine;
-    chartInstance.data.datasets[2].data   = perfLine;
+    chartInstance.data.labels              = d.months;
+    chartInstance.data.datasets[0].data    = collectionPct;
+    chartInstance.data.datasets[1].data    = targetLine;
+    chartInstance.data.datasets[2].data    = perfLine;
     chartInstance.options.scales.yRate.max = yRateMax;
     chartInstance.options.scales.yRate.min = yRateMin;
     chartInstance.update();
@@ -243,22 +271,9 @@ function updateChart() {
       data: {
         labels: d.months,
         datasets: [
-          {
-            type:'bar', label:'Collection %', data:collectionPct,
-            backgroundColor:'rgba(174,235,89,0.9)', order:2,
-            yAxisID:'yCollection', barPercentage:0.8, categoryPercentage:0.85
-          },
-          {
-            type:'line', label:'Target', data:targetLine,
-            borderColor:'#FF7F00', borderDash:[5,3], borderWidth:1.5,
-            pointRadius:0, order:0, yAxisID:'yRate', tension:0
-          },
-          {
-            type:'line', label:'Performance', data:perfLine,
-            borderColor:'#242424', borderWidth:1.5, pointRadius:2,
-            pointBackgroundColor:'#242424', pointBorderColor:'#F7F7F7',
-            pointBorderWidth:1, order:1, yAxisID:'yRate', tension:0.3, spanGaps:false
-          }
+          { type:'bar',  label:'Collection %', data:collectionPct, backgroundColor:'rgba(174,235,89,0.9)', order:2, yAxisID:'yCollection', barPercentage:0.8, categoryPercentage:0.85 },
+          { type:'line', label:'Target',        data:targetLine,    borderColor:'#FF7F00', borderDash:[5,3], borderWidth:1.5, pointRadius:0, order:0, yAxisID:'yRate', tension:0 },
+          { type:'line', label:'Performance',   data:perfLine,      borderColor:'#242424', borderWidth:1.5, pointRadius:2, pointBackgroundColor:'#242424', pointBorderColor:'#F7F7F7', pointBorderWidth:1, order:1, yAxisID:'yRate', tension:0.3, spanGaps:false }
         ]
       },
       options: {
@@ -270,22 +285,18 @@ function updateChart() {
             backgroundColor:'#ffffff', borderColor:'#e0e0e0', borderWidth:1,
             titleColor:'#999', bodyColor:'#242424',
             titleFont:{family:'Inter',size:10}, bodyFont:{family:'Inter',size:10},
-            callbacks:{label(ctx){
-              if(ctx.dataset.yAxisID==='yCollection') return ` ${ctx.dataset.label}: ${fmtPct(ctx.parsed.y)}`;
-              return ` ${ctx.dataset.label}: ${fmtPct(ctx.parsed.y)}`;
-            }}
+            callbacks:{label(ctx){ return ` ${ctx.dataset.label}: ${fmtPct(ctx.parsed.y)}`; }}
           }
         },
         scales:{
-          x:{grid:{color:'#ebebeb'},ticks:{color:'#999',font:{family:'Inter',size:9}},border:{color:'#e0e0e0'}},
-          yCollection:{position:'right', min:0, max:1, grid:{display:false}, ticks:{color:'#999',font:{family:'Inter',size:9},callback:v=>Math.round(v*100)+'%'},border:{color:'#e0e0e0'}},
-          yRate:{position:'left', min:yRateMin, max:yRateMax, grid:{color:'#ebebeb'}, ticks:{stepSize:0.1, color:'#999',font:{family:'Inter',size:9},callback:v=>Math.round(v*100)+'%'},border:{color:'#e0e0e0'}}
+          x:{ grid:{color:'#ebebeb'}, ticks:{color:'#999',font:{family:'Inter',size:9}}, border:{color:'#e0e0e0'} },
+          yCollection:{ position:'right', min:0, max:1, grid:{display:false}, ticks:{color:'#999',font:{family:'Inter',size:9},callback:v=>Math.round(v*100)+'%'}, border:{color:'#e0e0e0'} },
+          yRate:{ position:'left', min:yRateMin, max:yRateMax, grid:{color:'#ebebeb'}, ticks:{stepSize:0.1,color:'#999',font:{family:'Inter',size:9},callback:v=>Math.round(v*100)+'%'}, border:{color:'#e0e0e0'} }
         }
       }
     });
   }
 
-  // Pillar cards
   const pillars = [
     {label:'ABI Mainstream',     billed:d.abiMainBilled, cash:d.abiMainCash, target:d.abiMainTarget},
     {label:'ABI Prestige',       billed:d.abiPresBilled, cash:d.abiPresCash, target:d.abiPresTarget},
