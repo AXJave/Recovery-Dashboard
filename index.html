@@ -7,57 +7,61 @@
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
   :root {
-    --bg:#F7F7F7;--surface:#fff;--border:#e0e0e0;
-    --collected:#AEEB59;--target-line:#FF7F00;--perf-above:#AEEB59;--perf-below:#F85858;
-    --text-primary:#242424;--text-secondary:#666;--text-muted:#999;--font:'Inter',sans-serif;
+    --bg: #F7F7F7; --surface: #ffffff; --surface2: #f0f0f0; --border: #e0e0e0;
+    --collected: #AEEB59; --target-line: #FF7F00; --perf-above: #AEEB59; --perf-below: #F85858;
+    --text-primary: #242424; --text-secondary: #666; --text-muted: #999; --font: 'Inter', sans-serif;
   }
-  *{box-sizing:border-box;margin:0;padding:0;}
-  html,body{height:100%;overflow:hidden;}
-  body{background:var(--bg);color:var(--text-primary);font-family:var(--font);font-size:11px;padding:10px;display:flex;flex-direction:column;}
-  .dashboard{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;}
-  .top-bar{display:flex;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap;flex-shrink:0;}
-  .fy-label{font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;}
-  .fy-btn{background:var(--surface);border:1px solid var(--border);color:var(--text-secondary);font-family:var(--font);font-size:10px;font-weight:500;padding:4px 10px;cursor:pointer;}
-  .fy-btn.active{background:var(--collected);border-color:var(--collected);color:#242424;font-weight:700;}
-  .filter-bar{display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap;flex-shrink:0;}
-  .filter-btn{background:var(--surface);border:1px solid var(--border);color:var(--text-secondary);font-family:var(--font);font-size:9px;font-weight:500;letter-spacing:0.5px;text-transform:uppercase;padding:5px 10px;cursor:pointer;}
-  .filter-btn.active{background:var(--collected);border-color:var(--collected);color:#242424;font-weight:700;}
-  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:8px;flex-shrink:0;}
-  .kpi{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--border);padding:10px 12px;}
-  .kpi.highlight{border-left-color:var(--collected);}
-  .kpi.above{border-left-color:var(--collected);}
-  .kpi.below{border-left-color:var(--perf-below);}
-  .kpi-label{color:var(--text-muted);font-size:9px;text-transform:uppercase;letter-spacing:1px;font-weight:500;margin-bottom:4px;}
-  .kpi-value{font-size:18px;font-weight:700;line-height:1;}
-  .kpi-sub{color:var(--text-secondary);font-size:9px;margin-top:3px;}
-  .pos{color:var(--perf-above);}.neg{color:var(--perf-below);}
-  .chart-container{background:var(--surface);border:1px solid var(--border);padding:10px;margin-bottom:8px;flex-shrink:0;}
-  .chart-wrapper{position:relative;height:220px;width:100%;}
-  .chart-title{font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text-muted);font-weight:600;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px;}
-  .legend{display:flex;gap:12px;flex-wrap:wrap;}
-  .legend-item{display:flex;align-items:center;gap:5px;font-size:9px;color:var(--text-secondary);text-transform:none;letter-spacing:0;}
-  .legend-swatch{width:12px;height:8px;border-radius:1px;}
-  .legend-line{width:16px;height:2px;border-top:2px dashed;}
-  canvas{width:100%!important;display:block;}
-  .pillar-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;flex-shrink:0;}
-  .pillar-card{background:var(--surface);border:1px solid var(--border);padding:10px 12px;}
-  .pillar-name{font-size:11px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px;}
-  .progress-labels{display:flex;justify-content:space-between;font-size:9px;color:var(--text-secondary);margin-bottom:4px;}
-  .progress-track{height:16px;background:#d0d0d0;position:relative;overflow:visible;}
-  .progress-fill{height:100%;background:rgba(174,235,89,0.85);position:absolute;top:0;left:0;transition:width 0.8s cubic-bezier(0.4,0,0.2,1);}
-  .target-marker{position:absolute;top:-3px;width:2px;height:calc(100% + 6px);background:var(--target-line);z-index:2;}
-  .target-marker::after{content:'T';position:absolute;top:-12px;left:50%;transform:translateX(-50%);font-size:8px;color:var(--target-line);font-weight:700;}
-  .pillar-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:8px;text-align:center;}
-  .pstat-val{font-size:13px;font-weight:700;}
-  .pstat-lbl{font-size:8px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;margin-top:2px;font-weight:500;}
-  .no-data{text-align:center;padding:40px;color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:1px;}
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { height: 100%; overflow: hidden; }
+  body { background: var(--bg); color: var(--text-primary); font-family: var(--font); font-size: 11px; padding: 10px; height: 100%; overflow: hidden; display: flex; flex-direction: column; }
+  .dashboard { width: 100%; flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+  .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px; flex-wrap: wrap; flex-shrink: 0; }
+  .fy-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+  .fy-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text-secondary); font-family: var(--font); font-size: 10px; font-weight: 500; padding: 4px 10px; cursor: pointer; transition: all 0.15s; }
+  .fy-btn.active { background: var(--collected); border-color: var(--collected); color: #242424; font-weight: 700; }
+  .fy-btn:hover:not(.active) { border-color: var(--collected); color: var(--text-primary); }
+  .filter-bar { display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; flex-shrink: 0; }
+  .filter-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text-secondary); font-family: var(--font); font-size: 9px; font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; padding: 5px 10px; cursor: pointer; transition: all 0.15s; }
+  .filter-btn.active { background: var(--collected); border-color: var(--collected); color: #242424; font-weight: 700; }
+  .filter-btn:hover:not(.active) { border-color: var(--collected); color: var(--text-primary); }
+  .kpi-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; margin-bottom: 8px; flex-shrink: 0; }
+  .kpi { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--border); padding: 10px 12px; }
+  .kpi.highlight { border-left-color: var(--collected); }
+  .kpi.above { border-left-color: var(--collected); }
+  .kpi.below { border-left-color: var(--perf-below); }
+  .kpi-label { color: var(--text-muted); font-size: 9px; text-transform: uppercase; letter-spacing: 1px; font-weight: 500; margin-bottom: 4px; }
+  .kpi-value { font-size: 18px; font-weight: 700; line-height: 1; }
+  .kpi-sub { color: var(--text-secondary); font-size: 9px; margin-top: 3px; }
+  .pos { color: var(--perf-above); } .neg { color: var(--perf-below); }
+  .chart-container { background: var(--surface); border: 1px solid var(--border); padding: 10px; margin-bottom: 8px; flex-shrink: 0; }
+  .chart-wrapper { position: relative; height: 220px; width: 100%; flex-shrink: 0; }
+  .chart-title { font-size: 9px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); font-weight: 600; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px; }
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 9px; color: var(--text-secondary); text-transform: none; letter-spacing: 0; }
+  .legend-swatch { width: 12px; height: 8px; border-radius: 1px; }
+  .legend-line { width: 16px; height: 2px; border-top: 2px dashed; }
+  canvas { width: 100% !important; display: block; }
+  .pillar-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 6px; flex-shrink: 0; }
+  .pillar-card { background: var(--surface); border: 1px solid var(--border); padding: 10px 12px; }
+  .pillar-name { font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 8px; }
+  .progress-labels { display: flex; justify-content: space-between; font-size: 9px; color: var(--text-secondary); margin-bottom: 4px; }
+  .progress-track { height: 16px; background: #d0d0d0; position: relative; overflow: visible; }
+  .progress-fill { height: 100%; background: rgba(174,235,89,0.85); position: absolute; top: 0; left: 0; transition: width 0.8s cubic-bezier(0.4,0,0.2,1); }
+  .target-marker { position: absolute; top: -3px; width: 2px; height: calc(100% + 6px); background: var(--target-line); z-index: 2; }
+  .target-marker::after { content: 'T'; position: absolute; top: -12px; left: 50%; transform: translateX(-50%); font-size: 8px; color: var(--target-line); font-weight: 700; }
+  .pillar-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 4px; margin-top: 8px; text-align: center; }
+  .pstat-val { font-size: 13px; font-weight: 700; }
+  .pstat-lbl { font-size: 8px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; margin-top: 2px; font-weight: 500; }
+  .no-data { text-align: center; padding: 40px; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
 </style>
 </head>
 <body>
 <div class="dashboard">
   <div class="top-bar">
-    <span class="fy-label">Financial Year</span>
-    <div id="fy-selector" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <span class="fy-label">Financial Year</span>
+      <div id="fy-selector" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
+    </div>
   </div>
   <div class="filter-bar">
     <button class="filter-btn" onclick="setFilter('all',this)">All Pillars</button>
@@ -85,159 +89,245 @@
   </div>
   <div class="pillar-grid" id="pillar-grid"></div>
 </div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
-let currentFilter='abiMain',currentFY=null,chartInstance=null,ALL_DATA={},FY_LIST=[];
+let currentFilter = 'abiMain';
+let currentFY = null;
+let chartInstance = null;
+let ALL_DATA = {};
+let FY_LIST = [];
 
-function getParams(){
-  const p=new URLSearchParams(window.location.search);
-  const get=(k,fb)=>{const v=p.get(k);return(v!==null&&v!==''&&v!=='null')?v:fb;};
-  // DAX passes monthly (non-cumulative) values /1000 — multiply back and accumulate
-  const parseCum=(raw)=>{
-    if(!raw)return[];
-    let c=0;
-    return raw.split('|').map(v=>{c+=(parseFloat(v)||0)*1000;return c;});
+function getParams() {
+  const p = new URLSearchParams(window.location.search);
+  const get = (k, fb) => { const v = p.get(k); return (v !== null && v !== '' && v !== 'null') ? v : fb; };
+  // DAX passes values divided by 1000 — multiply back here
+  const parseSeries = (raw, months) => {
+    if (!raw) return months.map(()=>0);
+    return raw.split('|').map(v=>(parseFloat(v)||0)*1000);
   };
-  const parseBlock=(s)=>{
-    const mr=get('months'+s,null);
-    const months=mr?mr.split('|'):[];
-    if(!months.length)return null;
-    return{
+  const parseBlock = (suffix) => {
+    const monthsRaw = get('months'+suffix, null);
+    const months = monthsRaw ? monthsRaw.split('|') : [];
+    if (!months.length) return null;
+    return {
       months,
-      abiMainBilled:parseCum(get('amb'+s,null)),abiMainCash:parseCum(get('amc'+s,null)),abiMainRev:parseCum(get('amr'+s,null)),abiMainTarget:parseFloat(get('amt'+s,'0.74')),
-      abiPresBilled:parseCum(get('apb'+s,null)),abiPresCash:parseCum(get('apc'+s,null)),abiPresRev:parseCum(get('apr'+s,null)),abiPresTarget:parseFloat(get('apt'+s,'0.78')),
-      nonMainBilled:parseCum(get('nmb'+s,null)),nonMainCash:parseCum(get('nmc'+s,null)),nonMainRev:parseCum(get('nmr'+s,null)),nonMainTarget:parseFloat(get('nmt'+s,'0.65')),
-      nonPresBilled:parseCum(get('npb'+s,null)),nonPresCash:parseCum(get('npc'+s,null)),nonPresRev:parseCum(get('npr'+s,null)),nonPresTarget:parseFloat(get('npt'+s,'0.63')),
+      abiMainBilled:  parseSeries(get('amb'+suffix,null), months),
+      abiMainCash:    parseSeries(get('amc'+suffix,null), months),
+      abiMainTarget:  parseFloat(get('amt'+suffix,'0.74')),
+      abiPresBilled:  parseSeries(get('apb'+suffix,null), months),
+      abiPresCash:    parseSeries(get('apc'+suffix,null), months),
+      abiPresTarget:  parseFloat(get('apt'+suffix,'0.78')),
+      nonMainBilled:  parseSeries(get('nmb'+suffix,null), months),
+      nonMainCash:    parseSeries(get('nmc'+suffix,null), months),
+      nonMainTarget:  parseFloat(get('nmt'+suffix,'0.65')),
+      nonPresBilled:  parseSeries(get('npb'+suffix,null), months),
+      nonPresCash:    parseSeries(get('npc'+suffix,null), months),
+      nonPresTarget:  parseFloat(get('npt'+suffix,'0.63')),
     };
   };
-  const result={};
-  const primary=get('fy',null);
-  const pd=parseBlock('');
-  if(primary&&pd)result[primary]=pd;
-  [2,3,4,5,6].forEach(i=>{const fy=get('fy'+i,null);const d=parseBlock(''+i);if(fy&&d)result[fy]=d;});
+  const result = {};
+  const primary = get('fy', null);
+  const primaryData = parseBlock('');
+  if (primary && primaryData) result[primary] = primaryData;
+  [2,3,4,5,6,7,8,9,10].forEach(i => {
+    const fy = get('fy'+i, null);
+    const data = parseBlock(''+i);
+    if (fy && data) result[fy] = data;
+  });
   return result;
 }
 
-function fmt(n){if(isNaN(n)||n===0)return'£0';if(n>=1000000)return'£'+(n/1000000).toFixed(2)+'M';if(n>=1000)return'£'+(n/1000).toFixed(0)+'K';return'£'+Math.round(n).toLocaleString();}
-function fmtPct(n){if(isNaN(n)||!isFinite(n))return'0.0%';return(n*100).toFixed(1)+'%';}
-function last(a){return a&&a.length?a[a.length-1]:0;}
+function fmt(n) {
+  if (isNaN(n)||n===0) return '£0';
+  if (n>=1000000) return '£'+(n/1000000).toFixed(2)+'M';
+  if (n>=1000) return '£'+(n/1000).toFixed(0)+'K';
+  return '£'+Math.round(n).toLocaleString();
+}
+function fmtPct(n) { if(isNaN(n)||!isFinite(n)) return '0.0%'; return (n*100).toFixed(1)+'%'; }
+function last(arr) { return arr&&arr.length ? arr[arr.length-1] : 0; }
 
-function getFilterData(d,f){
-  switch(f){
-    case'abiMain':return{billed:d.abiMainBilled,cash:d.abiMainCash,rev:d.abiMainRev,target:d.abiMainTarget};
-    case'abiPres':return{billed:d.abiPresBilled,cash:d.abiPresCash,rev:d.abiPresRev,target:d.abiPresTarget};
-    case'nonMain':return{billed:d.nonMainBilled,cash:d.nonMainCash,rev:d.nonMainRev,target:d.nonMainTarget};
-    case'nonPres':return{billed:d.nonPresBilled,cash:d.nonPresCash,rev:d.nonPresRev,target:d.nonPresTarget};
-    default:return{
-      billed:d.abiMainBilled.map((_,i)=>d.abiMainBilled[i]+d.abiPresBilled[i]+d.nonMainBilled[i]+d.nonPresBilled[i]),
-      cash:d.abiMainCash.map((_,i)=>d.abiMainCash[i]+d.abiPresCash[i]+d.nonMainCash[i]+d.nonPresCash[i]),
-      rev:d.abiMainRev.map((_,i)=>d.abiMainRev[i]+d.abiPresRev[i]+d.nonMainRev[i]+d.nonPresRev[i]),
-      target:(d.abiMainTarget+d.abiPresTarget+d.nonMainTarget+d.nonPresTarget)/4
+function getFilterData(d, filter) {
+  switch(filter) {
+    case 'abiMain': return { billed:d.abiMainBilled, cash:d.abiMainCash, target:d.abiMainTarget };
+    case 'abiPres': return { billed:d.abiPresBilled, cash:d.abiPresCash, target:d.abiPresTarget };
+    case 'nonMain': return { billed:d.nonMainBilled, cash:d.nonMainCash, target:d.nonMainTarget };
+    case 'nonPres': return { billed:d.nonPresBilled, cash:d.nonPresCash, target:d.nonPresTarget };
+    default: return {
+      billed: d.abiMainBilled.map((_,i)=>d.abiMainBilled[i]+d.abiPresBilled[i]+d.nonMainBilled[i]+d.nonPresBilled[i]),
+      cash:   d.abiMainCash.map((_,i)=>d.abiMainCash[i]+d.abiPresCash[i]+d.nonMainCash[i]+d.nonPresCash[i]),
+      target: (d.abiMainTarget+d.abiPresTarget+d.nonMainTarget+d.nonPresTarget)/4
     };
   }
 }
 
-function setFilter(f,btn){currentFilter=f;document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');updateChart();}
-function setFY(fy){currentFY=fy;document.querySelectorAll('.fy-btn').forEach(b=>b.classList.toggle('active',b.dataset.fy===fy));updateChart();}
+function setFilter(filter, btn) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  updateChart();
+}
 
-function buildFYSelector(){
-  const sel=document.getElementById('fy-selector');sel.innerHTML='';
-  FY_LIST.forEach(fy=>{
-    const btn=document.createElement('button');
-    btn.className='fy-btn'+(fy===currentFY?' active':'');
-    btn.textContent=fy;btn.dataset.fy=fy;btn.onclick=()=>setFY(fy);
+function setFY(fy) {
+  currentFY = fy;
+  document.querySelectorAll('.fy-btn').forEach(b=>b.classList.toggle('active', b.dataset.fy===fy));
+  updateChart();
+}
+
+function buildFYSelector() {
+  const sel = document.getElementById('fy-selector');
+  sel.innerHTML = '';
+  FY_LIST.forEach(fy => {
+    const btn = document.createElement('button');
+    btn.className = 'fy-btn'+(fy===currentFY?' active':'');
+    btn.textContent = fy;
+    btn.dataset.fy = fy;
+    btn.onclick = () => setFY(fy);
     sel.appendChild(btn);
   });
 }
 
-function updateChart(){
-  const d=ALL_DATA[currentFY];
-  if(!d){document.getElementById('pillar-grid').innerHTML='<div class="no-data">No data</div>';return;}
-  const f=getFilterData(d,currentFilter);
-  const tb=last(f.billed),tc=last(f.cash),tr=last(f.rev);
-  const perf=tr>0?tc/tr:0,variance=perf-f.target,isAbove=variance>=0;
+function updateChart() {
+  const d = ALL_DATA[currentFY];
+  if (!d) {
+    document.getElementById('pillar-grid').innerHTML = '<div class="no-data">No data for selected period</div>';
+    return;
+  }
 
-  document.getElementById('kpi-billed').textContent=fmt(tb);
-  document.getElementById('kpi-collected').textContent=fmt(tc);
-  document.getElementById('kpi-perf').textContent=fmtPct(perf);
-  document.getElementById('kpi-target').textContent=fmtPct(f.target);
-  document.getElementById('kpi-variance-sub').innerHTML=`<span class="${isAbove?'pos':'neg'}">${isAbove?'▲':'▼'} ${(Math.abs(variance)*100).toFixed(1)}%</span> vs Target`;
-  document.getElementById('kpi-perf-card').className='kpi '+(isAbove?'above':'below');
+  const f = getFilterData(d, currentFilter);
+  const totalBilled = last(f.billed);
+  const totalCash   = last(f.cash);
+  const totalPerf   = totalBilled > 0 ? totalCash / totalBilled : 0;
+  const variance    = totalPerf - f.target;
+  const isAbove     = variance >= 0;
 
-  const collPct=f.cash.map(v=>tb>0?v/tb:0);
-  const perfLine=f.rev.map((r,i)=>r>0?f.cash[i]/r:null);
-  const targLine=d.months.map(()=>f.target);
-  const vp=perfLine.filter(v=>v!==null&&isFinite(v));
-  const maxV=vp.length?Math.max(...vp,f.target):f.target;
-  const minV=vp.length?Math.min(...vp,f.target):0;
-  const yMax=(Math.ceil(maxV*10)/10)+0.1,yMin=Math.max(0,(Math.floor(minV*10)/10)-0.1);
+  // KPI cards
+  document.getElementById('kpi-billed').textContent    = fmt(totalBilled);
+  document.getElementById('kpi-collected').textContent = fmt(totalCash);
+  document.getElementById('kpi-perf').textContent      = fmtPct(totalPerf);
+  document.getElementById('kpi-target').textContent    = fmtPct(f.target);
+  document.getElementById('kpi-variance-sub').innerHTML =
+    `<span class="${isAbove?'pos':'neg'}">${isAbove?'▲':'▼'} ${(Math.abs(variance)*100).toFixed(1)}%</span> vs Target`;
+  document.getElementById('kpi-perf-card').className = 'kpi '+(isAbove?'above':'below');
 
-  if(chartInstance){
-    chartInstance.data.labels=d.months;
-    chartInstance.data.datasets[0].data=collPct;
-    chartInstance.data.datasets[1].data=targLine;
-    chartInstance.data.datasets[2].data=perfLine;
-    chartInstance.options.scales.yRate.max=yMax;
-    chartInstance.options.scales.yRate.min=yMin;
+  // Collection % bar = cumulative cash / total FY billed (how much of the pot has been recovered)
+  const collectionPct = f.cash.map(v => totalBilled > 0 ? v / totalBilled : 0);
+
+  // Performance line = cumulative cash / cumulative RawABIRevenue (both from NetHireUR)
+  const perfLine  = f.billed.map((b,i) => b > 0 ? f.cash[i] / b : null);
+  const targetLine = d.months.map(() => f.target);
+
+  // Dynamic axis for performance/target lines
+  const validPerf = perfLine.filter(v => v !== null && !isNaN(v) && isFinite(v));
+  const maxPerf   = validPerf.length ? Math.max(...validPerf) : 1;
+  const minPerf   = validPerf.length ? Math.min(...validPerf) : 0;
+  const maxVal    = Math.max(maxPerf, f.target);
+  const minVal    = Math.min(minPerf, f.target);
+  const yRateMax  = (Math.ceil(maxVal * 10) / 10) + 0.1;
+  const yRateMin  = Math.max(0, (Math.floor(minVal * 10) / 10) - 0.1);
+
+  if (chartInstance) {
+    chartInstance.data.labels             = d.months;
+    chartInstance.data.datasets[0].data   = collectionPct;
+    chartInstance.data.datasets[1].data   = targetLine;
+    chartInstance.data.datasets[2].data   = perfLine;
+    chartInstance.options.scales.yRate.max = yRateMax;
+    chartInstance.options.scales.yRate.min = yRateMin;
     chartInstance.update();
-  }else{
-    const canvas=document.getElementById('mainChart');
-    canvas.width=canvas.parentElement.offsetWidth;canvas.height=220;
-    chartInstance=new Chart(canvas.getContext('2d'),{
-      data:{labels:d.months,datasets:[
-        {type:'bar',label:'Collection %',data:collPct,backgroundColor:'rgba(174,235,89,0.9)',order:2,yAxisID:'yCollection',barPercentage:0.8,categoryPercentage:0.85},
-        {type:'line',label:'Target',data:targLine,borderColor:'#FF7F00',borderDash:[5,3],borderWidth:1.5,pointRadius:0,order:0,yAxisID:'yRate',tension:0},
-        {type:'line',label:'Performance',data:perfLine,borderColor:'#242424',borderWidth:1.5,pointRadius:2,pointBackgroundColor:'#242424',pointBorderColor:'#F7F7F7',pointBorderWidth:1,order:1,yAxisID:'yRate',tension:0.3,spanGaps:false}
-      ]},
-      options:{
-        responsive:false,maintainAspectRatio:false,animation:{duration:350},
-        interaction:{mode:'index',intersect:false},
-        plugins:{legend:{display:false},tooltip:{backgroundColor:'#fff',borderColor:'#e0e0e0',borderWidth:1,titleColor:'#999',bodyColor:'#242424',titleFont:{family:'Inter',size:10},bodyFont:{family:'Inter',size:10},callbacks:{label(ctx){return` ${ctx.dataset.label}: ${fmtPct(ctx.parsed.y)}`;}} }},
+  } else {
+    const canvas = document.getElementById('mainChart');
+    canvas.width  = canvas.parentElement.offsetWidth;
+    canvas.height = 220;
+    const ctx = canvas.getContext('2d');
+    chartInstance = new Chart(ctx, {
+      data: {
+        labels: d.months,
+        datasets: [
+          {
+            type:'bar', label:'Collection %', data:collectionPct,
+            backgroundColor:'rgba(174,235,89,0.9)', order:2,
+            yAxisID:'yCollection', barPercentage:0.8, categoryPercentage:0.85
+          },
+          {
+            type:'line', label:'Target', data:targetLine,
+            borderColor:'#FF7F00', borderDash:[5,3], borderWidth:1.5,
+            pointRadius:0, order:0, yAxisID:'yRate', tension:0
+          },
+          {
+            type:'line', label:'Performance', data:perfLine,
+            borderColor:'#242424', borderWidth:1.5, pointRadius:2,
+            pointBackgroundColor:'#242424', pointBorderColor:'#F7F7F7',
+            pointBorderWidth:1, order:1, yAxisID:'yRate', tension:0.3, spanGaps:false
+          }
+        ]
+      },
+      options: {
+        responsive:false, maintainAspectRatio:false, animation:{duration:350},
+        interaction:{mode:'index', intersect:false},
+        plugins:{
+          legend:{display:false},
+          tooltip:{
+            backgroundColor:'#ffffff', borderColor:'#e0e0e0', borderWidth:1,
+            titleColor:'#999', bodyColor:'#242424',
+            titleFont:{family:'Inter',size:10}, bodyFont:{family:'Inter',size:10},
+            callbacks:{label(ctx){
+              if(ctx.dataset.yAxisID==='yCollection') return ` ${ctx.dataset.label}: ${fmtPct(ctx.parsed.y)}`;
+              return ` ${ctx.dataset.label}: ${fmtPct(ctx.parsed.y)}`;
+            }}
+          }
+        },
         scales:{
           x:{grid:{color:'#ebebeb'},ticks:{color:'#999',font:{family:'Inter',size:9}},border:{color:'#e0e0e0'}},
-          yCollection:{position:'right',min:0,max:1,grid:{display:false},ticks:{color:'#999',font:{family:'Inter',size:9},callback:v=>Math.round(v*100)+'%'},border:{color:'#e0e0e0'}},
-          yRate:{position:'left',min:yMin,max:yMax,grid:{color:'#ebebeb'},ticks:{stepSize:0.1,color:'#999',font:{family:'Inter',size:9},callback:v=>Math.round(v*100)+'%'},border:{color:'#e0e0e0'}}
+          yCollection:{position:'right', min:0, max:1, grid:{display:false}, ticks:{color:'#999',font:{family:'Inter',size:9},callback:v=>Math.round(v*100)+'%'},border:{color:'#e0e0e0'}},
+          yRate:{position:'left', min:yRateMin, max:yRateMax, grid:{color:'#ebebeb'}, ticks:{stepSize:0.1, color:'#999',font:{family:'Inter',size:9},callback:v=>Math.round(v*100)+'%'},border:{color:'#e0e0e0'}}
         }
       }
     });
   }
 
-  const pillars=[
-    {label:'ABI Mainstream',billed:d.abiMainBilled,cash:d.abiMainCash,rev:d.abiMainRev,target:d.abiMainTarget},
-    {label:'ABI Prestige',billed:d.abiPresBilled,cash:d.abiPresCash,rev:d.abiPresRev,target:d.abiPresTarget},
-    {label:'Non-ABI Mainstream',billed:d.nonMainBilled,cash:d.nonMainCash,rev:d.nonMainRev,target:d.nonMainTarget},
-    {label:'Non-ABI Prestige',billed:d.nonPresBilled,cash:d.nonPresCash,rev:d.nonPresRev,target:d.nonPresTarget},
+  // Pillar cards
+  const pillars = [
+    {label:'ABI Mainstream',     billed:d.abiMainBilled, cash:d.abiMainCash, target:d.abiMainTarget},
+    {label:'ABI Prestige',       billed:d.abiPresBilled, cash:d.abiPresCash, target:d.abiPresTarget},
+    {label:'Non-ABI Mainstream', billed:d.nonMainBilled, cash:d.nonMainCash, target:d.nonMainTarget},
+    {label:'Non-ABI Prestige',   billed:d.nonPresBilled, cash:d.nonPresCash, target:d.nonPresTarget},
   ];
-  const grid=document.getElementById('pillar-grid');grid.innerHTML='';
-  pillars.forEach(p=>{
-    const lb=last(p.billed),lc=last(p.cash),lr=last(p.rev);
-    const pf=lr>0?lc/lr:0,vr=pf-p.target,up=vr>=0;
-    const card=document.createElement('div');card.className='pillar-card';
-    card.innerHTML=`
+  const grid = document.getElementById('pillar-grid');
+  grid.innerHTML = '';
+  pillars.forEach(p => {
+    const lb=last(p.billed), lc=last(p.cash);
+    const perf=lb>0?lc/lb:0, vari=perf-p.target, isUp=vari>=0;
+    const card = document.createElement('div');
+    card.className = 'pillar-card';
+    card.innerHTML = `
       <div class="pillar-name">${p.label}</div>
       <div class="progress-labels"><span>${fmt(lc)} collected</span><span>${fmt(lb)} billed</span></div>
       <div class="progress-track">
-        <div class="progress-fill" style="width:${Math.min(pf*100,100).toFixed(1)}%"></div>
+        <div class="progress-fill" style="width:${Math.min(perf*100,100).toFixed(1)}%"></div>
         <div class="target-marker" style="left:${Math.min(p.target*100,100).toFixed(1)}%"></div>
       </div>
       <div class="pillar-stats">
-        <div><div class="pstat-val">${fmtPct(pf)}</div><div class="pstat-lbl">Performance</div></div>
+        <div><div class="pstat-val">${fmtPct(perf)}</div><div class="pstat-lbl">Performance</div></div>
         <div><div class="pstat-val">${fmtPct(p.target)}</div><div class="pstat-lbl">Target</div></div>
-        <div><div class="pstat-val ${up?'pos':'neg'}">${up?'▲':'▼'} ${(Math.abs(vr)*100).toFixed(1)}%</div><div class="pstat-lbl">Variance</div></div>
+        <div><div class="pstat-val ${isUp?'pos':'neg'}">${isUp?'▲':'▼'} ${(Math.abs(vari)*100).toFixed(1)}%</div><div class="pstat-lbl">Variance</div></div>
       </div>`;
     grid.appendChild(card);
   });
 }
 
-ALL_DATA=getParams();
-FY_LIST=Object.keys(ALL_DATA).sort();
-if(!FY_LIST.length){
-  document.getElementById('pillar-grid').innerHTML='<div class="no-data">Waiting for data...</div>';
-}else{
-  currentFY=FY_LIST[FY_LIST.length-1];
+function render() {
+  ALL_DATA = getParams();
+  FY_LIST = Object.keys(ALL_DATA).sort();
+  if (!FY_LIST.length) {
+    document.getElementById('pillar-grid').innerHTML = '<div class="no-data">Waiting for data...</div>';
+    return;
+  }
+  currentFY = FY_LIST[FY_LIST.length-1];
   buildFYSelector();
   updateChart();
 }
+
+render();
 </script>
 </body>
 </html>
