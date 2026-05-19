@@ -7,7 +7,7 @@
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
   :root {
-    --bg: #F7F7F7; --surface: #ffffff; --border: #e0e0e0;
+    --bg: #F7F7F7; --surface: #ffffff; --surface2: #f0f0f0; --border: #e0e0e0;
     --collected: #AEEB59; --target-line: #FF7F00; --perf-above: #AEEB59; --perf-below: #F85858;
     --text-primary: #242424; --text-secondary: #666; --text-muted: #999; --font: 'Inter', sans-serif;
   }
@@ -99,22 +99,27 @@ let ALL_DATA = {};
 let FY_LIST = [];
 
 function getParams() {
-  const p = new URLSearchParams(window.location.search);
-  const d = p.get("d");
-  if (!d) return {};
+  const raw = location.hash ? location.hash.slice(1) : location.search.slice(1);
+  if (!raw) return {};
   const result = {};
-  d.split("~").filter(b => b.length > 0).forEach(block => {
-    const f = block.split("^");
+  const blocks = raw.split('^').filter(b => b.length > 0);
+  blocks.forEach(block => {
+    const f = block.split('~');
     if (f.length < 14) return;
-    const ps = s => s ? s.split("|").map(v => (parseFloat(v)||0)*1000) : [];
+    const ps = s => s ? s.split('|').map(v => (parseFloat(v)||0)*1000) : [];
     result[f[0]] = {
-      months:        f[1].split("|"),
-      abiMainBilled: ps(f[2]),  abiMainCash: ps(f[3]),  abiMainTarget: parseFloat(f[10]||"0.74"),
-      abiPresBilled: ps(f[4]),  abiPresCash: ps(f[5]),  abiPresTarget: parseFloat(f[11]||"0.78"),
-      nonMainBilled: ps(f[6]),  nonMainCash: ps(f[7]),  nonMainTarget: parseFloat(f[12]||"0.65"),
-      nonPresBilled: ps(f[8]),  nonPresCash: ps(f[9]),  nonPresTarget: parseFloat(f[13]||"0.63"),
-      abiMainRev:    ps(f[14]), abiPresRev:  ps(f[15]),
-      nonMainRev:    ps(f[16]), nonPresRev:  ps(f[17]),
+      months:        f[1].split('|'),
+      abiMainBilled: ps(f[2]),  abiMainCash: ps(f[3]),
+      abiPresBilled: ps(f[4]),  abiPresCash: ps(f[5]),
+      nonMainBilled: ps(f[6]),  nonMainCash: ps(f[7]),
+      nonPresBilled: ps(f[8]),  nonPresCash: ps(f[9]),
+      abiMainTarget: parseFloat(f[10]||'0.74'),
+      abiPresTarget: parseFloat(f[11]||'0.78'),
+      nonMainTarget: parseFloat(f[12]||'0.65'),
+      nonPresTarget: parseFloat(f[13]||'0.63'),
+      // NetHires revenue for performance line (fields 14-17)
+      abiMainRev: ps(f[14]), abiPresRev: ps(f[15]),
+      nonMainRev: ps(f[16]), nonPresRev: ps(f[17]),
     };
   });
   return result;
@@ -138,7 +143,7 @@ function getFilterData(d, filter) {
     default: return {
       billed: d.abiMainBilled.map((_,i)=>d.abiMainBilled[i]+d.abiPresBilled[i]+d.nonMainBilled[i]+d.nonPresBilled[i]),
       cash:   d.abiMainCash.map((_,i)=>d.abiMainCash[i]+d.abiPresCash[i]+d.nonMainCash[i]+d.nonPresCash[i]),
-      rev:    (d.abiMainRev||[]).map((_,i)=>(d.abiMainRev[i]||0)+(d.abiPresRev[i]||0)+(d.nonMainRev[i]||0)+(d.nonPresRev[i]||0)),
+      rev:    d.abiMainRev.map((_,i)=>(d.abiMainRev[i]||0)+(d.abiPresRev[i]||0)+(d.nonMainRev[i]||0)+(d.nonPresRev[i]||0)),
       target: (d.abiMainTarget+d.abiPresTarget+d.nonMainTarget+d.nonPresTarget)/4
     };
   }
@@ -180,7 +185,9 @@ function updateChart() {
   const f = getFilterData(d, currentFilter);
   const totalBilled = last(f.billed);
   const totalCash   = last(f.cash);
-  const totalPerf   = totalBilled > 0 ? totalCash / totalBilled : 0;
+  const totalRev    = last(f.rev);
+  // KPI performance = cash / NetHires revenue
+  const totalPerf   = totalRev > 0 ? totalCash / totalRev : 0;
   const variance    = totalPerf - f.target;
   const isAbove     = variance >= 0;
 
@@ -192,10 +199,12 @@ function updateChart() {
     `<span class="${isAbove?'pos':'neg'}">${isAbove?'▲':'▼'} ${(Math.abs(variance)*100).toFixed(1)}%</span> vs Target`;
   document.getElementById('kpi-perf-card').className = 'kpi '+(isAbove?'above':'below');
 
+  // Collection % bar = cumulative cash / total billed (month-end bible)
   const collectionPct = f.cash.map(v => totalBilled > 0 ? v / totalBilled : 0);
-  const perfSrc = (f.rev && f.rev.length) ? f.rev : f.billed;
-  const perfLine      = perfSrc.map((r,i) => r > 0 ? f.cash[i] / r : null);
-  const targetLine    = d.months.map(() => f.target);
+
+  // Performance line = cash / NetHires revenue
+  const perfLine  = f.rev.map((r,i) => r > 0 ? f.cash[i] / r : null);
+  const targetLine = d.months.map(() => f.target);
 
   const validPerf = perfLine.filter(v => v !== null && !isNaN(v) && isFinite(v));
   const maxPerf   = validPerf.length ? Math.max(...validPerf) : 1;
@@ -249,16 +258,18 @@ function updateChart() {
   }
 
   const pillars = [
-    {label:'ABI Mainstream',     billed:d.abiMainBilled, cash:d.abiMainCash, target:d.abiMainTarget},
-    {label:'ABI Prestige',       billed:d.abiPresBilled, cash:d.abiPresCash, target:d.abiPresTarget},
-    {label:'Non-ABI Mainstream', billed:d.nonMainBilled, cash:d.nonMainCash, target:d.nonMainTarget},
-    {label:'Non-ABI Prestige',   billed:d.nonPresBilled, cash:d.nonPresCash, target:d.nonPresTarget},
+    {label:'ABI Mainstream',     billed:d.abiMainBilled, cash:d.abiMainCash, rev:d.abiMainRev, target:d.abiMainTarget},
+    {label:'ABI Prestige',       billed:d.abiPresBilled, cash:d.abiPresCash, rev:d.abiPresRev, target:d.abiPresTarget},
+    {label:'Non-ABI Mainstream', billed:d.nonMainBilled, cash:d.nonMainCash, rev:d.nonMainRev, target:d.nonMainTarget},
+    {label:'Non-ABI Prestige',   billed:d.nonPresBilled, cash:d.nonPresCash, rev:d.nonPresRev, target:d.nonPresTarget},
   ];
   const grid = document.getElementById('pillar-grid');
   grid.innerHTML = '';
   pillars.forEach(p => {
-    const lb=last(p.billed), lc=last(p.cash);
-    const perf=lb>0?lc/lb:0, vari=perf-p.target, isUp=vari>=0;
+    const lb=last(p.billed), lc=last(p.cash), lr=last(p.rev);
+    // Performance on card = cash / NetHires revenue
+    const perf = lr>0 ? lc/lr : 0;
+    const vari=perf-p.target, isUp=vari>=0;
     const card = document.createElement('div');
     card.className = 'pillar-card';
     card.innerHTML = `
