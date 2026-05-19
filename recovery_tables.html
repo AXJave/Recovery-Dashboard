@@ -61,7 +61,42 @@ let ALL_DATA = {};
 let FY_LIST = [];
 
 function getParams() {
-  const p = new URLSearchParams(window.location.search);
+  // Read from hash fragment (#) — no length limit unlike query string (?)
+  // Falls back to query string for backwards compatibility
+  const raw = location.hash ? location.hash.slice(1) : location.search.slice(1);
+  if (!raw) return {};
+
+  const result = {};
+
+  // Compact hash format: FY blocks separated by ~
+  // Each block fields separated by ^: fy^months^amb^amc^apb^apc^nmb^nmc^npb^npc^amt^apt^nmt^npt
+  if (raw.indexOf('~') !== -1 || (raw.indexOf('^') !== -1 && raw.indexOf('=') === -1)) {
+    const blocks = raw.split('~').filter(b => b.length > 0);
+    blocks.forEach(block => {
+      const f = block.split('^');
+      if (f.length < 14) return;
+      const ps = s => s ? s.split('|').map(v => (parseFloat(v)||0)*1000) : [];
+      result[f[0]] = {
+        months:        f[1].split('|'),
+        abiMainBilled: ps(f[2]),
+        abiMainCash:   ps(f[3]),
+        abiMainTarget: parseFloat(f[10]||'0.74'),
+        abiPresBilled: ps(f[4]),
+        abiPresCash:   ps(f[5]),
+        abiPresTarget: parseFloat(f[11]||'0.78'),
+        nonMainBilled: ps(f[6]),
+        nonMainCash:   ps(f[7]),
+        nonMainTarget: parseFloat(f[12]||'0.65'),
+        nonPresBilled: ps(f[8]),
+        nonPresCash:   ps(f[9]),
+        nonPresTarget: parseFloat(f[13]||'0.63'),
+      };
+    });
+    return result;
+  }
+
+  // Legacy query string fallback
+  const p = new URLSearchParams(raw);
   const get = (k, fb) => { const v = p.get(k); return (v !== null && v !== '' && v !== 'null') ? v : fb; };
   const parseSeries = (raw, months) => {
     if (!raw) return months.map(()=>0);
@@ -87,7 +122,6 @@ function getParams() {
       nonPresTarget:  parseFloat(get('npt'+suffix,'0.63')),
     };
   };
-  const result = {};
   const primary = get('fy', null);
   const primaryData = parseBlock('');
   if (primary && primaryData) result[primary] = primaryData;
@@ -138,7 +172,7 @@ function renderTables() {
   const totalBilled = last(d.abiMainBilled)+last(d.abiPresBilled)+last(d.nonMainBilled)+last(d.nonPresBilled);
   const totalCash   = last(d.abiMainCash)+last(d.abiPresCash)+last(d.nonMainCash)+last(d.nonPresCash);
 
-  // ── TABLE 1: Cumulative Cash & Revenue ──────────────────────────────────────
+  // TABLE 1: Cumulative Cash & Revenue
   let t1 = `<table>
     <thead>
       <tr>
@@ -156,8 +190,7 @@ function renderTables() {
         <th>Cash</th><th class="pillar-group">Revenue</th>
         <th>Cash</th><th>Revenue</th>
       </tr>
-    </thead>
-    <tbody>`;
+    </thead><tbody>`;
 
   d.months.forEach((m, i) => {
     const totC = d.abiMainCash[i]+d.abiPresCash[i]+d.nonMainCash[i]+d.nonPresCash[i];
@@ -171,7 +204,6 @@ function renderTables() {
       <td>${fmt(totC)}</td><td>${fmt(totB)}</td>
     </tr>`;
   });
-
   t1 += `<tr class="total-row">
     <td>Total</td>
     <td>${fmt(last(d.abiMainCash))}</td><td class="pillar-group">${fmt(last(d.abiMainBilled))}</td>
@@ -179,16 +211,14 @@ function renderTables() {
     <td>${fmt(last(d.nonMainCash))}</td><td class="pillar-group">${fmt(last(d.nonMainBilled))}</td>
     <td>${fmt(last(d.nonPresCash))}</td><td class="pillar-group">${fmt(last(d.nonPresBilled))}</td>
     <td>${fmt(totalCash)}</td><td>${fmt(totalBilled)}</td>
-  </tr>`;
-  t1 += `</tbody></table>`;
+  </tr></tbody></table>`;
   document.getElementById('table1-container').innerHTML = t1;
 
-  // ── TABLE 2: Performance, Target & Collection % ──────────────────────────────
+  // TABLE 2: Performance, Target & Collection %
   const totalABIMainBilled = last(d.abiMainBilled);
   const totalABIPresBilled = last(d.abiPresBilled);
   const totalNonMainBilled = last(d.nonMainBilled);
   const totalNonPresBilled = last(d.nonPresBilled);
-  const totalAllBilled     = totalBilled;
 
   let t2 = `<table>
     <thead>
@@ -207,57 +237,47 @@ function renderTables() {
         <th>Perf %</th><th>Target</th><th class="pillar-group">Collection</th>
         <th>Perf %</th><th>Target</th><th>Collection</th>
       </tr>
-    </thead>
-    <tbody>`;
+    </thead><tbody>`;
+
+  const perfClass = (p, t) => p===null?'': p>=t?'pos':'neg';
+  const avgTarget = (d.abiMainTarget+d.abiPresTarget+d.nonMainTarget+d.nonPresTarget)/4;
 
   d.months.forEach((m, i) => {
-    const amPerf = d.abiMainBilled[i]>0 ? d.abiMainCash[i]/d.abiMainBilled[i] : null;
-    const apPerf = d.abiPresBilled[i]>0 ? d.abiPresCash[i]/d.abiPresBilled[i] : null;
-    const nmPerf = d.nonMainBilled[i]>0  ? d.nonMainCash[i]/d.nonMainBilled[i] : null;
-    const npPerf = d.nonPresBilled[i]>0  ? d.nonPresCash[i]/d.nonPresBilled[i] : null;
-    const totB   = d.abiMainBilled[i]+d.abiPresBilled[i]+d.nonMainBilled[i]+d.nonPresBilled[i];
-    const totC   = d.abiMainCash[i]+d.abiPresCash[i]+d.nonMainCash[i]+d.nonPresCash[i];
-    const totPerf = totB>0 ? totC/totB : null;
-
+    const amP = d.abiMainBilled[i]>0 ? d.abiMainCash[i]/d.abiMainBilled[i] : null;
+    const apP = d.abiPresBilled[i]>0 ? d.abiPresCash[i]/d.abiPresBilled[i] : null;
+    const nmP = d.nonMainBilled[i]>0  ? d.nonMainCash[i]/d.nonMainBilled[i] : null;
+    const npP = d.nonPresBilled[i]>0  ? d.nonPresCash[i]/d.nonPresBilled[i] : null;
+    const totB = d.abiMainBilled[i]+d.abiPresBilled[i]+d.nonMainBilled[i]+d.nonPresBilled[i];
+    const totC = d.abiMainCash[i]+d.abiPresCash[i]+d.nonMainCash[i]+d.nonPresCash[i];
+    const totP = totB>0 ? totC/totB : null;
     const amColl = totalABIMainBilled>0 ? d.abiMainBilled[i]/totalABIMainBilled : 0;
     const apColl = totalABIPresBilled>0 ? d.abiPresBilled[i]/totalABIPresBilled : 0;
     const nmColl = totalNonMainBilled>0 ? d.nonMainBilled[i]/totalNonMainBilled : 0;
     const npColl = totalNonPresBilled>0 ? d.nonPresBilled[i]/totalNonPresBilled : 0;
-    const totColl = totalAllBilled>0 ? totB/totalAllBilled : 0;
-
-    const perfClass = (p, t) => p===null?'': p>=t?'pos':'neg';
-
+    const totColl = totalBilled>0 ? totB/totalBilled : 0;
     t2 += `<tr>
       <td>${m}</td>
-      <td class="${perfClass(amPerf,d.abiMainTarget)}">${fmtPct(amPerf)}</td><td>${fmtPct(d.abiMainTarget)}</td><td class="pillar-group">${fmtPct(amColl)}</td>
-      <td class="${perfClass(apPerf,d.abiPresTarget)}">${fmtPct(apPerf)}</td><td>${fmtPct(d.abiPresTarget)}</td><td class="pillar-group">${fmtPct(apColl)}</td>
-      <td class="${perfClass(nmPerf,d.nonMainTarget)}">${fmtPct(nmPerf)}</td><td>${fmtPct(d.nonMainTarget)}</td><td class="pillar-group">${fmtPct(nmColl)}</td>
-      <td class="${perfClass(npPerf,d.nonPresTarget)}">${fmtPct(npPerf)}</td><td>${fmtPct(d.nonPresTarget)}</td><td class="pillar-group">${fmtPct(npColl)}</td>
-      <td class="${perfClass(totPerf,(d.abiMainTarget+d.abiPresTarget+d.nonMainTarget+d.nonPresTarget)/4)}">${fmtPct(totPerf)}</td>
-      <td>${fmtPct((d.abiMainTarget+d.abiPresTarget+d.nonMainTarget+d.nonPresTarget)/4)}</td>
-      <td>${fmtPct(totColl)}</td>
+      <td class="${perfClass(amP,d.abiMainTarget)}">${fmtPct(amP)}</td><td>${fmtPct(d.abiMainTarget)}</td><td class="pillar-group">${fmtPct(amColl)}</td>
+      <td class="${perfClass(apP,d.abiPresTarget)}">${fmtPct(apP)}</td><td>${fmtPct(d.abiPresTarget)}</td><td class="pillar-group">${fmtPct(apColl)}</td>
+      <td class="${perfClass(nmP,d.nonMainTarget)}">${fmtPct(nmP)}</td><td>${fmtPct(d.nonMainTarget)}</td><td class="pillar-group">${fmtPct(nmColl)}</td>
+      <td class="${perfClass(npP,d.nonPresTarget)}">${fmtPct(npP)}</td><td>${fmtPct(d.nonPresTarget)}</td><td class="pillar-group">${fmtPct(npColl)}</td>
+      <td class="${perfClass(totP,avgTarget)}">${fmtPct(totP)}</td><td>${fmtPct(avgTarget)}</td><td>${fmtPct(totColl)}</td>
     </tr>`;
   });
 
-  // Total row
-  const amPerfT = last(d.abiMainBilled)>0 ? last(d.abiMainCash)/last(d.abiMainBilled) : null;
-  const apPerfT = last(d.abiPresBilled)>0 ? last(d.abiPresCash)/last(d.abiPresBilled) : null;
-  const nmPerfT = last(d.nonMainBilled)>0  ? last(d.nonMainCash)/last(d.nonMainBilled) : null;
-  const npPerfT = last(d.nonPresBilled)>0  ? last(d.nonPresCash)/last(d.nonPresBilled) : null;
-  const totPerfT = totalBilled>0 ? totalCash/totalBilled : null;
-  const perfClass = (p, t) => p===null?'': p>=t?'pos':'neg';
-
+  const amPT = last(d.abiMainBilled)>0 ? last(d.abiMainCash)/last(d.abiMainBilled) : null;
+  const apPT = last(d.abiPresBilled)>0 ? last(d.abiPresCash)/last(d.abiPresBilled) : null;
+  const nmPT = last(d.nonMainBilled)>0  ? last(d.nonMainCash)/last(d.nonMainBilled) : null;
+  const npPT = last(d.nonPresBilled)>0  ? last(d.nonPresCash)/last(d.nonPresBilled) : null;
+  const totPT = totalBilled>0 ? totalCash/totalBilled : null;
   t2 += `<tr class="total-row">
     <td>Total</td>
-    <td class="${perfClass(amPerfT,d.abiMainTarget)}">${fmtPct(amPerfT)}</td><td>${fmtPct(d.abiMainTarget)}</td><td class="pillar-group">100.0%</td>
-    <td class="${perfClass(apPerfT,d.abiPresTarget)}">${fmtPct(apPerfT)}</td><td>${fmtPct(d.abiPresTarget)}</td><td class="pillar-group">100.0%</td>
-    <td class="${perfClass(nmPerfT,d.nonMainTarget)}">${fmtPct(nmPerfT)}</td><td>${fmtPct(d.nonMainTarget)}</td><td class="pillar-group">100.0%</td>
-    <td class="${perfClass(npPerfT,d.nonPresTarget)}">${fmtPct(npPerfT)}</td><td>${fmtPct(d.nonPresTarget)}</td><td class="pillar-group">100.0%</td>
-    <td class="${perfClass(totPerfT,(d.abiMainTarget+d.abiPresTarget+d.nonMainTarget+d.nonPresTarget)/4)}">${fmtPct(totPerfT)}</td>
-    <td>${fmtPct((d.abiMainTarget+d.abiPresTarget+d.nonMainTarget+d.nonPresTarget)/4)}</td>
-    <td>100.0%</td>
-  </tr>`;
-  t2 += `</tbody></table>`;
+    <td class="${perfClass(amPT,d.abiMainTarget)}">${fmtPct(amPT)}</td><td>${fmtPct(d.abiMainTarget)}</td><td class="pillar-group">100.0%</td>
+    <td class="${perfClass(apPT,d.abiPresTarget)}">${fmtPct(apPT)}</td><td>${fmtPct(d.abiPresTarget)}</td><td class="pillar-group">100.0%</td>
+    <td class="${perfClass(nmPT,d.nonMainTarget)}">${fmtPct(nmPT)}</td><td>${fmtPct(d.nonMainTarget)}</td><td class="pillar-group">100.0%</td>
+    <td class="${perfClass(npPT,d.nonPresTarget)}">${fmtPct(npPT)}</td><td>${fmtPct(d.nonPresTarget)}</td><td class="pillar-group">100.0%</td>
+    <td class="${perfClass(totPT,avgTarget)}">${fmtPct(totPT)}</td><td>${fmtPct(avgTarget)}</td><td>100.0%</td>
+  </tr></tbody></table>`;
   document.getElementById('table2-container').innerHTML = t2;
 }
 
