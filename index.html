@@ -99,74 +99,23 @@ let ALL_DATA = {};
 let FY_LIST = [];
 
 function getParams() {
-  // Read from hash fragment (#) — no length limit unlike query string (?)
-  // Falls back to query string for backwards compatibility
-  const raw = location.hash ? location.hash.slice(1) : location.search.slice(1);
-  if (!raw) return {};
-
+  const p = new URLSearchParams(window.location.search);
+  const d = p.get("d");
+  if (!d) return {};
   const result = {};
-
-  // New compact hash format: FY blocks separated by ^
-  // Each block: fy~months~amb~amc~apb~apc~nmb~nmc~npb~npc~amt~apt~nmt~npt
-  if (raw.indexOf('^') !== -1 || (raw.indexOf('~') !== -1 && raw.indexOf('=') === -1)) {
-    const blocks = raw.split('^').filter(b => b.length > 0);
-    blocks.forEach(block => {
-      const f = block.split('~');
-      if (f.length < 14) return;
-      const ps = s => s ? s.split('|').map(v => (parseFloat(v)||0)*1000) : [];
-      result[f[0]] = {
-        months:         f[1].split('|'),
-        abiMainBilled:  ps(f[2]),
-        abiMainCash:    ps(f[3]),
-        abiMainTarget:  parseFloat(f[10]||'0.74'),
-        abiPresBilled:  ps(f[4]),
-        abiPresCash:    ps(f[5]),
-        abiPresTarget:  parseFloat(f[11]||'0.78'),
-        nonMainBilled:  ps(f[6]),
-        nonMainCash:    ps(f[7]),
-        nonMainTarget:  parseFloat(f[12]||'0.65'),
-        nonPresBilled:  ps(f[8]),
-        nonPresCash:    ps(f[9]),
-        nonPresTarget:  parseFloat(f[13]||'0.63'),
-      };
-    });
-    return result;
-  }
-
-  // Legacy query string format (? params)
-  const p = new URLSearchParams(raw);
-  const get = (k, fb) => { const v = p.get(k); return (v !== null && v !== '' && v !== 'null') ? v : fb; };
-  const parseSeries = (raw) => {
-    if (!raw) return [];
-    return raw.split('|').map(v => (parseFloat(v)||0)*1000);
-  };
-  const parseBlock = (suffix) => {
-    const monthsRaw = get('months'+suffix, null);
-    const months = monthsRaw ? monthsRaw.split('|') : [];
-    if (!months.length) return null;
-    return {
-      months,
-      abiMainBilled:  parseSeries(get('amb'+suffix,null)),
-      abiMainCash:    parseSeries(get('amc'+suffix,null)),
-      abiMainTarget:  parseFloat(get('amt'+suffix,'0.74')),
-      abiPresBilled:  parseSeries(get('apb'+suffix,null)),
-      abiPresCash:    parseSeries(get('apc'+suffix,null)),
-      abiPresTarget:  parseFloat(get('apt'+suffix,'0.78')),
-      nonMainBilled:  parseSeries(get('nmb'+suffix,null)),
-      nonMainCash:    parseSeries(get('nmc'+suffix,null)),
-      nonMainTarget:  parseFloat(get('nmt'+suffix,'0.65')),
-      nonPresBilled:  parseSeries(get('npb'+suffix,null)),
-      nonPresCash:    parseSeries(get('npc'+suffix,null)),
-      nonPresTarget:  parseFloat(get('npt'+suffix,'0.63')),
+  d.split("~").filter(b => b.length > 0).forEach(block => {
+    const f = block.split("^");
+    if (f.length < 14) return;
+    const ps = s => s ? s.split("|").map(v => (parseFloat(v)||0)*1000) : [];
+    result[f[0]] = {
+      months:        f[1].split("|"),
+      abiMainBilled: ps(f[2]),  abiMainCash: ps(f[3]),  abiMainTarget: parseFloat(f[10]||"0.74"),
+      abiPresBilled: ps(f[4]),  abiPresCash: ps(f[5]),  abiPresTarget: parseFloat(f[11]||"0.78"),
+      nonMainBilled: ps(f[6]),  nonMainCash: ps(f[7]),  nonMainTarget: parseFloat(f[12]||"0.65"),
+      nonPresBilled: ps(f[8]),  nonPresCash: ps(f[9]),  nonPresTarget: parseFloat(f[13]||"0.63"),
+      abiMainRev:    ps(f[14]), abiPresRev:  ps(f[15]),
+      nonMainRev:    ps(f[16]), nonPresRev:  ps(f[17]),
     };
-  };
-  const primary = get('fy', null);
-  const primaryData = parseBlock('');
-  if (primary && primaryData) result[primary] = primaryData;
-  [2,3,4,5,6,7,8,9,10].forEach(i => {
-    const fy = get('fy'+i, null);
-    const data = parseBlock(''+i);
-    if (fy && data) result[fy] = data;
   });
   return result;
 }
@@ -182,13 +131,14 @@ function last(arr) { return arr&&arr.length ? arr[arr.length-1] : 0; }
 
 function getFilterData(d, filter) {
   switch(filter) {
-    case 'abiMain': return { billed:d.abiMainBilled, cash:d.abiMainCash, target:d.abiMainTarget };
-    case 'abiPres': return { billed:d.abiPresBilled, cash:d.abiPresCash, target:d.abiPresTarget };
-    case 'nonMain': return { billed:d.nonMainBilled, cash:d.nonMainCash, target:d.nonMainTarget };
-    case 'nonPres': return { billed:d.nonPresBilled, cash:d.nonPresCash, target:d.nonPresTarget };
+    case 'abiMain': return { billed:d.abiMainBilled, cash:d.abiMainCash, rev:d.abiMainRev, target:d.abiMainTarget };
+    case 'abiPres': return { billed:d.abiPresBilled, cash:d.abiPresCash, rev:d.abiPresRev, target:d.abiPresTarget };
+    case 'nonMain': return { billed:d.nonMainBilled, cash:d.nonMainCash, rev:d.nonMainRev, target:d.nonMainTarget };
+    case 'nonPres': return { billed:d.nonPresBilled, cash:d.nonPresCash, rev:d.nonPresRev, target:d.nonPresTarget };
     default: return {
       billed: d.abiMainBilled.map((_,i)=>d.abiMainBilled[i]+d.abiPresBilled[i]+d.nonMainBilled[i]+d.nonPresBilled[i]),
       cash:   d.abiMainCash.map((_,i)=>d.abiMainCash[i]+d.abiPresCash[i]+d.nonMainCash[i]+d.nonPresCash[i]),
+      rev:    (d.abiMainRev||[]).map((_,i)=>(d.abiMainRev[i]||0)+(d.abiPresRev[i]||0)+(d.nonMainRev[i]||0)+(d.nonPresRev[i]||0)),
       target: (d.abiMainTarget+d.abiPresTarget+d.nonMainTarget+d.nonPresTarget)/4
     };
   }
@@ -243,7 +193,8 @@ function updateChart() {
   document.getElementById('kpi-perf-card').className = 'kpi '+(isAbove?'above':'below');
 
   const collectionPct = f.cash.map(v => totalBilled > 0 ? v / totalBilled : 0);
-  const perfLine      = f.billed.map((b,i) => b > 0 ? f.cash[i] / b : null);
+  const perfSrc = (f.rev && f.rev.length) ? f.rev : f.billed;
+  const perfLine      = perfSrc.map((r,i) => r > 0 ? f.cash[i] / r : null);
   const targetLine    = d.months.map(() => f.target);
 
   const validPerf = perfLine.filter(v => v !== null && !isNaN(v) && isFinite(v));
