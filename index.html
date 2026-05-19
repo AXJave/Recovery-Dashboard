@@ -136,14 +136,14 @@ function last(arr) { return arr&&arr.length ? arr[arr.length-1] : 0; }
 
 function getFilterData(d, filter) {
   switch(filter) {
-    case 'abiMain': return { billed:d.abiMainBilled, cash:d.abiMainCash, rev:d.abiMainRev, target:d.abiMainTarget };
-    case 'abiPres': return { billed:d.abiPresBilled, cash:d.abiPresCash, rev:d.abiPresRev, target:d.abiPresTarget };
-    case 'nonMain': return { billed:d.nonMainBilled, cash:d.nonMainCash, rev:d.nonMainRev, target:d.nonMainTarget };
-    case 'nonPres': return { billed:d.nonPresBilled, cash:d.nonPresCash, rev:d.nonPresRev, target:d.nonPresTarget };
+    case 'abiMain': return { billed:d.abiMainBilled, cash:d.abiMainCash, rev:(d.abiMainRev&&d.abiMainRev.length)?d.abiMainRev:d.abiMainBilled, target:d.abiMainTarget };
+    case 'abiPres': return { billed:d.abiPresBilled, cash:d.abiPresCash, rev:(d.abiPresRev&&d.abiPresRev.length)?d.abiPresRev:d.abiPresBilled, target:d.abiPresTarget };
+    case 'nonMain': return { billed:d.nonMainBilled, cash:d.nonMainCash, rev:(d.nonMainRev&&d.nonMainRev.length)?d.nonMainRev:d.nonMainBilled, target:d.nonMainTarget };
+    case 'nonPres': return { billed:d.nonPresBilled, cash:d.nonPresCash, rev:(d.nonPresRev&&d.nonPresRev.length)?d.nonPresRev:d.nonPresBilled, target:d.nonPresTarget };
     default: return {
       billed: d.abiMainBilled.map((_,i)=>d.abiMainBilled[i]+d.abiPresBilled[i]+d.nonMainBilled[i]+d.nonPresBilled[i]),
       cash:   d.abiMainCash.map((_,i)=>d.abiMainCash[i]+d.abiPresCash[i]+d.nonMainCash[i]+d.nonPresCash[i]),
-      rev:    d.abiMainRev.map((_,i)=>(d.abiMainRev[i]||0)+(d.abiPresRev[i]||0)+(d.nonMainRev[i]||0)+(d.nonPresRev[i]||0)),
+      rev:    (d.abiMainRev&&d.abiMainRev.length) ? d.abiMainRev.map((_,i)=>(d.abiMainRev[i]||0)+(d.abiPresRev[i]||0)+(d.nonMainRev[i]||0)+(d.nonPresRev[i]||0)) : d.abiMainBilled.map((_,i)=>d.abiMainBilled[i]+d.abiPresBilled[i]+d.nonMainBilled[i]+d.nonPresBilled[i]),
       target: (d.abiMainTarget+d.abiPresTarget+d.nonMainTarget+d.nonPresTarget)/4
     };
   }
@@ -267,8 +267,7 @@ function updateChart() {
   grid.innerHTML = '';
   pillars.forEach(p => {
     const lb=last(p.billed), lc=last(p.cash), lr=last(p.rev);
-    // Performance on card = cash / NetHires revenue
-    const perf = lr>0 ? lc/lr : 0;
+    const perf = lr>0 ? lc/lr : (lb>0 ? lc/lb : 0);
     const vari=perf-p.target, isUp=vari>=0;
     const card = document.createElement('div');
     card.className = 'pillar-card';
