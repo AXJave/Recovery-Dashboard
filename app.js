@@ -1,4 +1,3 @@
-// Recovery Rate Dashboard — loaded via srcdoc, reads window.__D for data
 (function() {
 
 let currentFilter = 'abiMain';
@@ -7,32 +6,50 @@ let chartInstance = null;
 let ALL_DATA = {};
 let FY_LIST = [];
 
-function parseData() {
-  const raw = window.__D;
-  if (!raw || !Array.isArray(raw)) return {};
-  const parseSeries = (s) => s ? s.split('|').map(v => (parseFloat(v)||0)*1000) : [];
-  const result = {};
-  raw.forEach(d => {
-    if (!d.fy || !d.months) return;
-    result[d.fy] = {
-      months:       d.months.split('|'),
-      abiMainBilled: parseSeries(d.amb),
-      abiMainCash:   parseSeries(d.amc),
-      abiMainRev:    parseSeries(d.amr),
-      abiMainTarget: parseFloat(d.amt||0.74),
-      abiPresBilled: parseSeries(d.apb),
-      abiPresCash:   parseSeries(d.apc),
-      abiPresRev:    parseSeries(d.apr),
-      abiPresTarget: parseFloat(d.apt||0.78),
-      nonMainBilled: parseSeries(d.nmb),
-      nonMainCash:   parseSeries(d.nmc),
-      nonMainRev:    parseSeries(d.nmr),
-      nonMainTarget: parseFloat(d.nmt||0.65),
-      nonPresBilled: parseSeries(d.npb),
-      nonPresCash:   parseSeries(d.npc),
-      nonPresRev:    parseSeries(d.npr),
-      nonPresTarget: parseFloat(d.npt||0.63),
+function getParams() {
+  const p = new URLSearchParams(window.location.search);
+  const get = (k, fb) => { const v = p.get(k); return (v !== null && v !== '' && v !== 'null') ? v : fb; };
+
+  // Values are monthly (non-cumulative), /1000 in DAX — multiply back and accumulate
+  const parseCumulative = (raw) => {
+    if (!raw) return [];
+    let cum = 0;
+    return raw.split('|').map(v => { cum += (parseFloat(v)||0)*1000; return cum; });
+  };
+
+  const parseBlock = (suffix) => {
+    const monthsRaw = get('months'+suffix, null);
+    const months = monthsRaw ? monthsRaw.split('|') : [];
+    if (!months.length) return null;
+    return {
+      months,
+      abiMainBilled:  parseCumulative(get('amb'+suffix, null)),
+      abiMainCash:    parseCumulative(get('amc'+suffix, null)),
+      abiMainRev:     parseCumulative(get('amr'+suffix, null)),
+      abiMainTarget:  parseFloat(get('amt'+suffix,'0.74')),
+      abiPresBilled:  parseCumulative(get('apb'+suffix, null)),
+      abiPresCash:    parseCumulative(get('apc'+suffix, null)),
+      abiPresRev:     parseCumulative(get('apr'+suffix, null)),
+      abiPresTarget:  parseFloat(get('apt'+suffix,'0.78')),
+      nonMainBilled:  parseCumulative(get('nmb'+suffix, null)),
+      nonMainCash:    parseCumulative(get('nmc'+suffix, null)),
+      nonMainRev:     parseCumulative(get('nmr'+suffix, null)),
+      nonMainTarget:  parseFloat(get('nmt'+suffix,'0.65')),
+      nonPresBilled:  parseCumulative(get('npb'+suffix, null)),
+      nonPresCash:    parseCumulative(get('npc'+suffix, null)),
+      nonPresRev:     parseCumulative(get('npr'+suffix, null)),
+      nonPresTarget:  parseFloat(get('npt'+suffix,'0.63')),
     };
+  };
+
+  const result = {};
+  const primary = get('fy', null);
+  const primaryData = parseBlock('');
+  if (primary && primaryData) result[primary] = primaryData;
+  [2,3,4,5,6].forEach(i => {
+    const fy = get('fy'+i, null);
+    const data = parseBlock(''+i);
+    if (fy && data) result[fy] = data;
   });
   return result;
 }
@@ -108,7 +125,8 @@ function updateChart() {
   const targetLine    = d.months.map(() => f.target);
 
   const validPerf = perfLine.filter(v => v !== null && isFinite(v));
-  const maxVal = Math.max(...validPerf, f.target), minVal = Math.min(...validPerf, f.target);
+  const maxVal = validPerf.length ? Math.max(...validPerf, f.target) : f.target;
+  const minVal = validPerf.length ? Math.min(...validPerf, f.target) : 0;
   const yRateMax = (Math.ceil(maxVal*10)/10)+0.1, yRateMin = Math.max(0,(Math.floor(minVal*10)/10)-0.1);
 
   if (chartInstance) {
@@ -171,7 +189,7 @@ function updateChart() {
 }
 
 function init() {
-  ALL_DATA = parseData();
+  ALL_DATA = getParams();
   FY_LIST  = Object.keys(ALL_DATA).sort();
   if (!FY_LIST.length) { document.getElementById('pillar-grid').innerHTML = '<div class="no-data">Waiting for data...</div>'; return; }
   currentFY = FY_LIST[FY_LIST.length-1];
@@ -179,10 +197,4 @@ function init() {
   updateChart();
 }
 
-// Load Chart.js then init
-const s = document.createElement('script');
-s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
-s.onload = init;
-document.head.appendChild(s);
-
-})();
+init();
