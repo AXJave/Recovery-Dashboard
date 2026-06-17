@@ -20,6 +20,21 @@
   .fy-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text-secondary); font-family: var(--font); font-size: 10px; font-weight: 500; padding: 4px 10px; cursor: pointer; transition: all 0.15s; }
   .fy-btn.active { background: var(--collected); border-color: var(--collected); color: #242424; font-weight: 700; }
   .fy-btn:hover:not(.active) { border-color: var(--collected); color: var(--text-primary); }
+
+  /* TPI Dropdown */
+  .tpi-wrap { position: relative; margin-left: auto; }
+  .tpi-toggle { background: var(--surface); border: 1px solid var(--border); color: var(--text-secondary); font-family: var(--font); font-size: 9px; font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; padding: 5px 10px; cursor: pointer; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .tpi-toggle.filtered { border-color: var(--collected); color: #242424; background: #f0fde0; }
+  .tpi-toggle::after { content: '▾'; font-size: 10px; }
+  .tpi-panel { display: none; position: absolute; right: 0; top: calc(100% + 2px); background: var(--surface); border: 1px solid var(--border); min-width: 160px; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+  .tpi-panel.open { display: block; }
+  .tpi-panel-header { display: flex; justify-content: space-between; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  .tpi-panel-header button { background: none; border: none; font-family: var(--font); font-size: 9px; color: var(--text-secondary); cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; padding: 0; }
+  .tpi-panel-header button:hover { color: var(--text-primary); }
+  .tpi-option { display: flex; align-items: center; gap: 6px; padding: 5px 8px; cursor: pointer; font-size: 10px; color: var(--text-primary); }
+  .tpi-option:hover { background: #f5f5f5; }
+  .tpi-option input[type=checkbox] { accent-color: #242424; width: 11px; height: 11px; cursor: pointer; }
+
   .table-section { background: var(--surface); border: 1px solid var(--border); margin-bottom: 12px; overflow-x: auto; }
   .table-title { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); padding: 8px 12px; border-bottom: 1px solid var(--border); }
   table { width: 100%; border-collapse: collapse; font-size: 10px; }
@@ -43,6 +58,17 @@
 <div class="top-bar">
   <span class="fy-label">Financial Year</span>
   <div id="fy-selector" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
+  <!-- TPI Group dropdown -->
+  <div class="tpi-wrap" id="tpi-wrap" style="display:none;">
+    <button class="tpi-toggle" id="tpi-toggle" onclick="toggleTPI(event)">TPI Group</button>
+    <div class="tpi-panel" id="tpi-panel">
+      <div class="tpi-panel-header">
+        <button onclick="selectAllTPI()">Select All</button>
+        <button onclick="clearTPI()">Clear</button>
+      </div>
+      <div id="tpi-options"></div>
+    </div>
+  </div>
 </div>
 
 <div class="table-section">
@@ -59,17 +85,24 @@
 let currentFY = null;
 let ALL_DATA = {};
 let FY_LIST = [];
+let TPI_GROUPS = [];
+let selectedTPI = new Set();
 
 function getParams() {
-  // Read from hash fragment (#) — no length limit unlike query string (?)
-  // Falls back to query string for backwards compatibility
   const raw = location.hash ? location.hash.slice(1) : location.search.slice(1);
   if (!raw) return {};
 
+  // Parse TPI groups from query string
+  const qRaw = location.search.slice(1);
+  if (qRaw) {
+    const qp = new URLSearchParams(qRaw);
+    const tpiRaw = qp.get('tpi');
+    if (tpiRaw) TPI_GROUPS = tpiRaw.split('|').filter(v => v.length > 0);
+  }
+
   const result = {};
 
-  // Compact hash format: FY blocks separated by ~
-  // Each block fields separated by ^: fy^months^amb^amc^apb^apc^nmb^nmc^npb^npc^amt^apt^nmt^npt
+  // Compact hash format: FY blocks separated by ~, fields by ^
   if (raw.indexOf('~') !== -1 || (raw.indexOf('^') !== -1 && raw.indexOf('=') === -1)) {
     const blocks = raw.split('~').filter(b => b.length > 0);
     blocks.forEach(block => {
@@ -142,6 +175,53 @@ function fmt(n) {
 function fmtPct(n) { if(isNaN(n)||!isFinite(n)) return '-'; return (n*100).toFixed(1)+'%'; }
 function last(arr) { return arr&&arr.length ? arr[arr.length-1] : 0; }
 
+// ── TPI Dropdown ──────────────────────────────────────────────────────────────
+function buildTPIDropdown() {
+  const wrap = document.getElementById('tpi-wrap');
+  if (!TPI_GROUPS.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+  selectedTPI = new Set(TPI_GROUPS);
+  const container = document.getElementById('tpi-options');
+  container.innerHTML = '';
+  TPI_GROUPS.forEach(g => {
+    const label = document.createElement('label');
+    label.className = 'tpi-option';
+    label.innerHTML = `<input type="checkbox" value="${g}" checked onchange="onTPIChange()"> ${g}`;
+    container.appendChild(label);
+  });
+  updateTPIToggleLabel();
+}
+
+function toggleTPI(e) {
+  e.stopPropagation();
+  document.getElementById('tpi-panel').classList.toggle('open');
+}
+document.addEventListener('click', () => document.getElementById('tpi-panel')?.classList.remove('open'));
+
+function selectAllTPI() {
+  selectedTPI = new Set(TPI_GROUPS);
+  document.querySelectorAll('#tpi-options input').forEach(cb => cb.checked = true);
+  updateTPIToggleLabel();
+}
+function clearTPI() {
+  selectedTPI = new Set();
+  document.querySelectorAll('#tpi-options input').forEach(cb => cb.checked = false);
+  updateTPIToggleLabel();
+}
+function onTPIChange() {
+  selectedTPI = new Set();
+  document.querySelectorAll('#tpi-options input:checked').forEach(cb => selectedTPI.add(cb.value));
+  updateTPIToggleLabel();
+}
+function updateTPIToggleLabel() {
+  const btn = document.getElementById('tpi-toggle');
+  const allSelected = selectedTPI.size === TPI_GROUPS.length;
+  btn.classList.toggle('filtered', !allSelected && selectedTPI.size > 0);
+  if (allSelected || selectedTPI.size === 0) btn.textContent = 'TPI Group';
+  else if (selectedTPI.size === 1) btn.textContent = [...selectedTPI][0];
+  else btn.textContent = `TPI Group (${selectedTPI.size})`;
+}
+
 function setFY(fy) {
   currentFY = fy;
   document.querySelectorAll('.fy-btn').forEach(b=>b.classList.toggle('active', b.dataset.fy===fy));
@@ -172,7 +252,7 @@ function renderTables() {
   const totalBilled = last(d.abiMainBilled)+last(d.abiPresBilled)+last(d.nonMainBilled)+last(d.nonPresBilled);
   const totalCash   = last(d.abiMainCash)+last(d.abiPresCash)+last(d.nonMainCash)+last(d.nonPresCash);
 
-  // TABLE 1: Cumulative Cash & Revenue
+  // TABLE 1
   let t1 = `<table>
     <thead>
       <tr>
@@ -214,7 +294,7 @@ function renderTables() {
   </tr></tbody></table>`;
   document.getElementById('table1-container').innerHTML = t1;
 
-  // TABLE 2: Performance, Target & Collection %
+  // TABLE 2
   const totalABIMainBilled = last(d.abiMainBilled);
   const totalABIPresBilled = last(d.abiPresBilled);
   const totalNonMainBilled = last(d.nonMainBilled);
@@ -291,6 +371,7 @@ function render() {
   }
   currentFY = FY_LIST[FY_LIST.length-1];
   buildFYSelector();
+  buildTPIDropdown();
   renderTables();
 }
 
