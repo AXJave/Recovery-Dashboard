@@ -20,10 +20,25 @@
   .fy-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text-secondary); font-family: var(--font); font-size: 10px; font-weight: 500; padding: 4px 10px; cursor: pointer; transition: all 0.15s; }
   .fy-btn.active { background: var(--collected); border-color: var(--collected); color: #242424; font-weight: 700; }
   .fy-btn:hover:not(.active) { border-color: var(--collected); color: var(--text-primary); }
-  .filter-bar { display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; flex-shrink: 0; }
+  .filter-bar { display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; flex-shrink: 0; align-items: center; }
   .filter-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text-secondary); font-family: var(--font); font-size: 9px; font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; padding: 5px 10px; cursor: pointer; transition: all 0.15s; }
   .filter-btn.active { background: var(--collected); border-color: var(--collected); color: #242424; font-weight: 700; }
   .filter-btn:hover:not(.active) { border-color: var(--collected); color: var(--text-primary); }
+
+  /* TPI Dropdown */
+  .tpi-wrap { position: relative; margin-left: auto; }
+  .tpi-toggle { background: var(--surface); border: 1px solid var(--border); color: var(--text-secondary); font-family: var(--font); font-size: 9px; font-weight: 500; letter-spacing: 0.5px; text-transform: uppercase; padding: 5px 10px; cursor: pointer; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .tpi-toggle.filtered { border-color: var(--collected); color: #242424; background: #f0fde0; }
+  .tpi-toggle::after { content: '▾'; font-size: 10px; }
+  .tpi-panel { display: none; position: absolute; right: 0; top: calc(100% + 2px); background: var(--surface); border: 1px solid var(--border); min-width: 160px; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+  .tpi-panel.open { display: block; }
+  .tpi-panel-header { display: flex; justify-content: space-between; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  .tpi-panel-header button { background: none; border: none; font-family: var(--font); font-size: 9px; color: var(--text-secondary); cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; padding: 0; }
+  .tpi-panel-header button:hover { color: var(--text-primary); }
+  .tpi-option { display: flex; align-items: center; gap: 6px; padding: 5px 8px; cursor: pointer; font-size: 10px; color: var(--text-primary); }
+  .tpi-option:hover { background: #f5f5f5; }
+  .tpi-option input[type=checkbox] { accent-color: #242424; width: 11px; height: 11px; cursor: pointer; }
+
   .kpi-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; margin-bottom: 8px; flex-shrink: 0; }
   .kpi { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--border); padding: 10px 12px; }
   .kpi.highlight { border-left-color: var(--collected); }
@@ -69,6 +84,17 @@
     <button class="filter-btn" onclick="setFilter('abiPres',this)">ABI Prestige</button>
     <button class="filter-btn" onclick="setFilter('nonMain',this)">Non-ABI Mainstream</button>
     <button class="filter-btn" onclick="setFilter('nonPres',this)">Non-ABI Prestige</button>
+    <!-- TPI Group dropdown -->
+    <div class="tpi-wrap" id="tpi-wrap" style="display:none;">
+      <button class="tpi-toggle" id="tpi-toggle" onclick="toggleTPI(event)">TPI Group</button>
+      <div class="tpi-panel" id="tpi-panel">
+        <div class="tpi-panel-header">
+          <button onclick="selectAllTPI()">Select All</button>
+          <button onclick="clearTPI()">Clear</button>
+        </div>
+        <div id="tpi-options"></div>
+      </div>
+    </div>
   </div>
   <div class="kpi-row">
     <div class="kpi"><div class="kpi-label">Total Billed</div><div class="kpi-value" id="kpi-billed">—</div><div class="kpi-sub">Raw ABI Revenue</div></div>
@@ -97,11 +123,23 @@ let currentFY = null;
 let chartInstance = null;
 let ALL_DATA = {};
 let FY_LIST = [];
+let TPI_GROUPS = [];       // all available groups
+let selectedTPI = new Set(); // currently selected (empty = all)
 
 function getParams() {
   const raw = location.hash ? location.hash.slice(1) : location.search.slice(1);
   if (!raw) return {};
   const result = {};
+
+  // Parse TPI groups from tpi= param in query string if present alongside hash
+  // They're passed as a separate ?tpi=... prefix before the #
+  const qRaw = location.search.slice(1);
+  if (qRaw) {
+    const qp = new URLSearchParams(qRaw);
+    const tpiRaw = qp.get('tpi');
+    if (tpiRaw) TPI_GROUPS = tpiRaw.split('|').filter(v => v.length > 0);
+  }
+
   const blocks = raw.split('^').filter(b => b.length > 0);
   blocks.forEach(block => {
     const f = block.split('~');
@@ -120,6 +158,9 @@ function getParams() {
       // NetHires revenue for performance line (fields 14-17)
       abiMainRev: ps(f[14]), abiPresRev: ps(f[15]),
       nonMainRev: ps(f[16]), nonPresRev: ps(f[17]),
+      // Monthly (non-cumulative) cash series (fields 18-21)
+      abiMainCashM: ps(f[18]), abiPresCashM: ps(f[19]),
+      nonMainCashM: ps(f[20]), nonPresCashM: ps(f[21]),
     };
   });
   return result;
@@ -134,17 +175,77 @@ function fmt(n) {
 function fmtPct(n) { if(isNaN(n)||!isFinite(n)) return '0.0%'; return (n*100).toFixed(1)+'%'; }
 function last(arr) { return arr&&arr.length ? arr[arr.length-1] : 0; }
 
+// ── TPI Dropdown ──────────────────────────────────────────────────────────────
+function buildTPIDropdown() {
+  const wrap = document.getElementById('tpi-wrap');
+  if (!TPI_GROUPS.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+  selectedTPI = new Set(TPI_GROUPS); // start with all selected
+  const container = document.getElementById('tpi-options');
+  container.innerHTML = '';
+  TPI_GROUPS.forEach(g => {
+    const label = document.createElement('label');
+    label.className = 'tpi-option';
+    label.innerHTML = `<input type="checkbox" value="${g}" checked onchange="onTPIChange()"> ${g}`;
+    container.appendChild(label);
+  });
+  updateTPIToggleLabel();
+}
+
+function toggleTPI(e) {
+  e.stopPropagation();
+  document.getElementById('tpi-panel').classList.toggle('open');
+}
+document.addEventListener('click', () => document.getElementById('tpi-panel')?.classList.remove('open'));
+
+function selectAllTPI() {
+  selectedTPI = new Set(TPI_GROUPS);
+  document.querySelectorAll('#tpi-options input').forEach(cb => cb.checked = true);
+  updateTPIToggleLabel();
+  updateChart();
+}
+function clearTPI() {
+  selectedTPI = new Set();
+  document.querySelectorAll('#tpi-options input').forEach(cb => cb.checked = false);
+  updateTPIToggleLabel();
+  updateChart();
+}
+function onTPIChange() {
+  selectedTPI = new Set();
+  document.querySelectorAll('#tpi-options input:checked').forEach(cb => selectedTPI.add(cb.value));
+  updateTPIToggleLabel();
+  updateChart();
+}
+function updateTPIToggleLabel() {
+  const btn = document.getElementById('tpi-toggle');
+  const allSelected = selectedTPI.size === TPI_GROUPS.length;
+  const noneSelected = selectedTPI.size === 0;
+  btn.classList.toggle('filtered', !allSelected && !noneSelected);
+  if (allSelected || noneSelected) btn.textContent = 'TPI Group';
+  else if (selectedTPI.size === 1) btn.textContent = [...selectedTPI][0];
+  else btn.textContent = `TPI Group (${selectedTPI.size})`;
+}
+
+// ── TPI-aware data accessor ───────────────────────────────────────────────────
+// When TPI filtering is active, DAX will have passed per-TPI series.
+// For now we use the pre-filtered series passed by DAX (DAX handles the filter).
+// The HTML simply re-renders; DAX is responsible for sending filtered values.
+// selectedTPI drives a postMessage back to Power BI if needed — for now
+// the filter selection is sent via URL param reload handled by DAX re-evaluation.
+// In standalone mode (outside PBI) the dropdown simply reflects what was passed.
+
 function getFilterData(d, filter) {
   switch(filter) {
-    case 'abiMain': return { billed:d.abiMainBilled, cash:d.abiMainCash, rev:(d.abiMainRev&&d.abiMainRev.length)?d.abiMainRev:d.abiMainBilled, target:d.abiMainTarget };
-    case 'abiPres': return { billed:d.abiPresBilled, cash:d.abiPresCash, rev:(d.abiPresRev&&d.abiPresRev.length)?d.abiPresRev:d.abiPresBilled, target:d.abiPresTarget };
-    case 'nonMain': return { billed:d.nonMainBilled, cash:d.nonMainCash, rev:(d.nonMainRev&&d.nonMainRev.length)?d.nonMainRev:d.nonMainBilled, target:d.nonMainTarget };
-    case 'nonPres': return { billed:d.nonPresBilled, cash:d.nonPresCash, rev:(d.nonPresRev&&d.nonPresRev.length)?d.nonPresRev:d.nonPresBilled, target:d.nonPresTarget };
+    case 'abiMain': return { billed:d.abiMainBilled, cash:d.abiMainCash, cashM:d.abiMainCashM, rev:(d.abiMainRev&&d.abiMainRev.length)?d.abiMainRev:d.abiMainBilled, target:d.abiMainTarget };
+    case 'abiPres': return { billed:d.abiPresBilled, cash:d.abiPresCash, cashM:d.abiPresCashM, rev:(d.abiPresRev&&d.abiPresRev.length)?d.abiPresRev:d.abiPresBilled, target:d.abiPresTarget };
+    case 'nonMain': return { billed:d.nonMainBilled, cash:d.nonMainCash, cashM:d.nonMainCashM, rev:(d.nonMainRev&&d.nonMainRev.length)?d.nonMainRev:d.nonMainBilled, target:d.nonMainTarget };
+    case 'nonPres': return { billed:d.nonPresBilled, cash:d.nonPresCash, cashM:d.nonPresCashM, rev:(d.nonPresRev&&d.nonPresRev.length)?d.nonPresRev:d.nonPresBilled, target:d.nonPresTarget };
     default: return {
-      billed: d.abiMainBilled.map((_,i)=>d.abiMainBilled[i]+d.abiPresBilled[i]+d.nonMainBilled[i]+d.nonPresBilled[i]),
-      cash:   d.abiMainCash.map((_,i)=>d.abiMainCash[i]+d.abiPresCash[i]+d.nonMainCash[i]+d.nonPresCash[i]),
-      rev:    (d.abiMainRev&&d.abiMainRev.length) ? d.abiMainRev.map((_,i)=>(d.abiMainRev[i]||0)+(d.abiPresRev[i]||0)+(d.nonMainRev[i]||0)+(d.nonPresRev[i]||0)) : d.abiMainBilled.map((_,i)=>d.abiMainBilled[i]+d.abiPresBilled[i]+d.nonMainBilled[i]+d.nonPresBilled[i]),
-      target: (d.abiMainTarget+d.abiPresTarget+d.nonMainTarget+d.nonPresTarget)/4
+      billed:  d.abiMainBilled.map((_,i)=>d.abiMainBilled[i]+d.abiPresBilled[i]+d.nonMainBilled[i]+d.nonPresBilled[i]),
+      cash:    d.abiMainCash.map((_,i)=>d.abiMainCash[i]+d.abiPresCash[i]+d.nonMainCash[i]+d.nonPresCash[i]),
+      cashM:   (d.abiMainCashM&&d.abiMainCashM.length) ? d.abiMainCashM.map((_,i)=>(d.abiMainCashM[i]||0)+(d.abiPresCashM[i]||0)+(d.nonMainCashM[i]||0)+(d.nonPresCashM[i]||0)) : [],
+      rev:     (d.abiMainRev&&d.abiMainRev.length) ? d.abiMainRev.map((_,i)=>(d.abiMainRev[i]||0)+(d.abiPresRev[i]||0)+(d.nonMainRev[i]||0)+(d.nonPresRev[i]||0)) : d.abiMainBilled.map((_,i)=>d.abiMainBilled[i]+d.abiPresBilled[i]+d.nonMainBilled[i]+d.nonPresBilled[i]),
+      target:  (d.abiMainTarget+d.abiPresTarget+d.nonMainTarget+d.nonPresTarget)/4
     };
   }
 }
@@ -186,7 +287,6 @@ function updateChart() {
   const totalBilled = last(f.billed);
   const totalCash   = last(f.cash);
   const totalRev    = last(f.rev);
-  // KPI performance = cash / NetHires revenue
   const totalPerf   = totalRev > 0 ? totalCash / totalRev : 0;
   const variance    = totalPerf - f.target;
   const isAbove     = variance >= 0;
@@ -199,12 +299,12 @@ function updateChart() {
     `<span class="${isAbove?'pos':'neg'}">${isAbove?'▲':'▼'} ${(Math.abs(variance)*100).toFixed(1)}%</span> vs Target`;
   document.getElementById('kpi-perf-card').className = 'kpi '+(isAbove?'above':'below');
 
-  // Collection % bar = cumulative cash / total billed (month-end bible)
   const collectionPct = f.cash.map(v => totalBilled > 0 ? v / totalBilled : 0);
+  const perfLine      = f.rev.map((r,i) => r > 0 ? f.cash[i] / r : null);
+  const targetLine    = d.months.map(() => f.target);
 
-  // Performance line = cash / NetHires revenue
-  const perfLine  = f.rev.map((r,i) => r > 0 ? f.cash[i] / r : null);
-  const targetLine = d.months.map(() => f.target);
+  // Monthly cash series (non-cumulative) — used only in tooltip
+  const monthlyCash = (f.cashM && f.cashM.length) ? f.cashM : [];
 
   const validPerf = perfLine.filter(v => v !== null && !isNaN(v) && isFinite(v));
   const maxPerf   = validPerf.length ? Math.max(...validPerf) : 1;
@@ -214,13 +314,32 @@ function updateChart() {
   const yRateMax  = (Math.ceil(maxVal * 10) / 10) + 0.1;
   const yRateMin  = Math.max(0, (Math.floor(minVal * 10) / 10) - 0.1);
 
+  // Custom tooltip with monthly cash added
+  const tooltipCallbacks = {
+    label(ctx) {
+      if (ctx.dataset.label === 'Collection %') return ` Collection %: ${fmtPct(ctx.parsed.y)}`;
+      if (ctx.dataset.label === 'Target')        return ` Target: ${fmtPct(ctx.parsed.y)}`;
+      if (ctx.dataset.label === 'Performance')   return ` Performance: ${fmtPct(ctx.parsed.y)}`;
+      return ` ${ctx.dataset.label}: ${fmtPct(ctx.parsed.y)}`;
+    },
+    afterBody(items) {
+      if (!monthlyCash.length) return [];
+      const idx = items[0]?.dataIndex;
+      if (idx === undefined) return [];
+      const val = monthlyCash[idx];
+      if (val === undefined || val === null || isNaN(val)) return [];
+      return [` Monthly Recovery: ${fmt(val)}`];
+    }
+  };
+
   if (chartInstance) {
-    chartInstance.data.labels              = d.months;
-    chartInstance.data.datasets[0].data    = collectionPct;
-    chartInstance.data.datasets[1].data    = targetLine;
-    chartInstance.data.datasets[2].data    = perfLine;
-    chartInstance.options.scales.yRate.max = yRateMax;
-    chartInstance.options.scales.yRate.min = yRateMin;
+    chartInstance.data.labels                              = d.months;
+    chartInstance.data.datasets[0].data                   = collectionPct;
+    chartInstance.data.datasets[1].data                   = targetLine;
+    chartInstance.data.datasets[2].data                   = perfLine;
+    chartInstance.options.scales.yRate.max                = yRateMax;
+    chartInstance.options.scales.yRate.min                = yRateMin;
+    chartInstance.options.plugins.tooltip.callbacks       = tooltipCallbacks;
     chartInstance.update();
   } else {
     const canvas = document.getElementById('mainChart');
@@ -245,7 +364,7 @@ function updateChart() {
             backgroundColor:'#ffffff', borderColor:'#e0e0e0', borderWidth:1,
             titleColor:'#999', bodyColor:'#242424',
             titleFont:{family:'Inter',size:10}, bodyFont:{family:'Inter',size:10},
-            callbacks:{label(ctx){ return ` ${ctx.dataset.label}: ${fmtPct(ctx.parsed.y)}`; }}
+            callbacks: tooltipCallbacks
           }
         },
         scales:{
@@ -296,6 +415,7 @@ function render() {
   }
   currentFY = FY_LIST[FY_LIST.length-1];
   buildFYSelector();
+  buildTPIDropdown();
   updateChart();
 }
 
