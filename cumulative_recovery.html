@@ -6,9 +6,25 @@
 <title>Cumulative Recovery</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-  :root { --bg:#F7F7F7; --surface:#fff; --border:#e0e0e0; --text:#242424; --muted:#999; --font:'Inter',sans-serif; }
+  :root { --bg:#F7F7F7; --surface:#fff; --border:#e0e0e0; --text:#242424; --muted:#999; --font:'Inter',sans-serif; --collected:#AEEB59; }
   * { box-sizing:border-box; margin:0; padding:0; }
   body { background:var(--bg); color:var(--text); font-family:var(--font); font-size:11px; padding:10px; overflow-y:auto; }
+  .top-bar { display:flex; align-items:center; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+
+  /* TPI Dropdown */
+  .tpi-wrap { position:relative; margin-left:auto; }
+  .tpi-toggle { background:#fff; border:1px solid var(--border); color:#666; font-family:var(--font); font-size:9px; font-weight:500; letter-spacing:0.5px; text-transform:uppercase; padding:5px 10px; cursor:pointer; display:flex; align-items:center; gap:6px; white-space:nowrap; }
+  .tpi-toggle.filtered { border-color:var(--collected); color:#242424; background:#f0fde0; }
+  .tpi-toggle::after { content:'▾'; font-size:10px; }
+  .tpi-panel { display:none; position:absolute; right:0; top:calc(100% + 2px); background:#fff; border:1px solid var(--border); min-width:160px; z-index:100; box-shadow:0 4px 12px rgba(0,0,0,0.1); }
+  .tpi-panel.open { display:block; }
+  .tpi-panel-header { display:flex; justify-content:space-between; padding:6px 8px; border-bottom:1px solid var(--border); }
+  .tpi-panel-header button { background:none; border:none; font-family:var(--font); font-size:9px; color:#666; cursor:pointer; text-transform:uppercase; letter-spacing:0.5px; padding:0; }
+  .tpi-panel-header button:hover { color:#242424; }
+  .tpi-option { display:flex; align-items:center; gap:6px; padding:5px 8px; cursor:pointer; font-size:10px; color:#242424; }
+  .tpi-option:hover { background:#f5f5f5; }
+  .tpi-option input[type=checkbox] { accent-color:#242424; width:11px; height:11px; cursor:pointer; }
+
   .table-wrap { overflow-x:auto; }
   table { border-collapse:collapse; font-size:10px; white-space:nowrap; width:100%; }
   th { background:#242424; color:#fff; padding:5px 8px; text-align:center; font-weight:600; font-size:9px; letter-spacing:0.5px; border-right:1px solid #333; }
@@ -24,23 +40,44 @@
 </style>
 </head>
 <body>
+
+<div class="top-bar">
+  <!-- TPI Group dropdown -->
+  <div class="tpi-wrap" id="tpi-wrap" style="display:none;">
+    <button class="tpi-toggle" id="tpi-toggle" onclick="toggleTPI(event)">TPI Group</button>
+    <div class="tpi-panel" id="tpi-panel">
+      <div class="tpi-panel-header">
+        <button onclick="selectAllTPI()">Select All</button>
+        <button onclick="clearTPI()">Clear</button>
+      </div>
+      <div id="tpi-options"></div>
+    </div>
+  </div>
+</div>
+
 <div class="table-wrap">
   <div id="table-container"></div>
 </div>
+
 <script>
+let TPI_GROUPS = [];
+let selectedTPI = new Set();
+
 function getParams() {
   const p = new URLSearchParams(window.location.search);
   const get = (k, fb) => { const v = p.get(k); return (v !== null && v !== '' && v !== 'null') ? v : fb; };
 
-  // Snaps are pre-computed ratios * 10000 passed from DAX.
-  // 0 = no data yet (ISBLANK cash), null = missing param.
+  // Parse TPI groups
+  const tpiRaw = get('tpi', null);
+  if (tpiRaw) TPI_GROUPS = tpiRaw.split('|').filter(v => v.length > 0);
+
   const parseSnaps = (raw) => {
     if (!raw) return Array(10).fill(null);
     return raw.split('|').map(v => {
       const n = parseFloat(v);
       if (isNaN(n)) return null;
-      if (n === 0) return null; // 0 sentinel = no cash data yet, show blank
-      return n / 10000;         // decode to decimal e.g. 7530 -> 0.753
+      if (n === 0) return null;
+      return n / 10000;
     });
   };
 
@@ -102,8 +139,57 @@ function cellColor(perf, target) {
   }
 }
 
+// ── TPI Dropdown ──────────────────────────────────────────────────────────────
+function buildTPIDropdown() {
+  const wrap = document.getElementById('tpi-wrap');
+  if (!TPI_GROUPS.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+  selectedTPI = new Set(TPI_GROUPS);
+  const container = document.getElementById('tpi-options');
+  container.innerHTML = '';
+  TPI_GROUPS.forEach(g => {
+    const label = document.createElement('label');
+    label.className = 'tpi-option';
+    label.innerHTML = `<input type="checkbox" value="${g}" checked onchange="onTPIChange()"> ${g}`;
+    container.appendChild(label);
+  });
+  updateTPIToggleLabel();
+}
+
+function toggleTPI(e) {
+  e.stopPropagation();
+  document.getElementById('tpi-panel').classList.toggle('open');
+}
+document.addEventListener('click', () => document.getElementById('tpi-panel')?.classList.remove('open'));
+
+function selectAllTPI() {
+  selectedTPI = new Set(TPI_GROUPS);
+  document.querySelectorAll('#tpi-options input').forEach(cb => cb.checked = true);
+  updateTPIToggleLabel();
+}
+function clearTPI() {
+  selectedTPI = new Set();
+  document.querySelectorAll('#tpi-options input').forEach(cb => cb.checked = false);
+  updateTPIToggleLabel();
+}
+function onTPIChange() {
+  selectedTPI = new Set();
+  document.querySelectorAll('#tpi-options input:checked').forEach(cb => selectedTPI.add(cb.value));
+  updateTPIToggleLabel();
+}
+function updateTPIToggleLabel() {
+  const btn = document.getElementById('tpi-toggle');
+  const allSelected = selectedTPI.size === TPI_GROUPS.length;
+  btn.classList.toggle('filtered', !allSelected && selectedTPI.size > 0);
+  if (allSelected || selectedTPI.size === 0) btn.textContent = 'TPI Group';
+  else if (selectedTPI.size === 1) btn.textContent = [...selectedTPI][0];
+  else btn.textContent = `TPI Group (${selectedTPI.size})`;
+}
+
 function render() {
   const data = getParams();
+  buildTPIDropdown();
+
   if (!data.length) {
     document.getElementById('table-container').innerHTML = '<div class="no-data">Waiting for data...</div>';
     return;
@@ -127,7 +213,6 @@ function render() {
     <tbody>`;
 
   data.forEach(row => {
-    // snaps are already cash/totalRevenue ratios (or null if no data)
     const snaps = row.snaps;
     html += `<tr>
       <td class="year">${row.fy}</td>
