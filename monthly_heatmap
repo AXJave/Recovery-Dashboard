@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monthly Recovery Heatmap</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+  :root {
+    --bg: #F7F7F7; --surface: #ffffff; --border: #e0e0e0;
+    --text: #242424; --muted: #999; --font: 'Inter', sans-serif;
+    --green-hi: #AEEB59; --red-hi: #F85858;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); font-family: var(--font); font-size: 11px; color: var(--text); padding: 10px; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
+
+  .header { margin-bottom: 8px; flex-shrink: 0; }
+  .title { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); }
+
+  .legend-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+  .legend-label { font-size: 9px; color: var(--muted); }
+  .legend-bar { display: flex; height: 8px; width: 160px; border-radius: 1px; overflow: hidden; }
+  .legend-bar-fill { flex: 1; }
+
+  .table-wrap { flex: 1; overflow: auto; }
+  table { border-collapse: collapse; font-size: 10px; white-space: nowrap; }
+
+  /* Sticky FY column */
+  th.fy-col, td.fy-col { position: sticky; left: 0; z-index: 2; background: #242424; color: #fff; font-weight: 700; padding: 5px 10px; text-align: left; border-right: 2px solid #555; min-width: 60px; }
+  th.fy-col { z-index: 3; background: #111; }
+
+  /* Month header */
+  th.month-col { background: #242424; color: #fff; font-size: 9px; font-weight: 500; padding: 5px 6px; text-align: center; border-right: 1px solid #333; white-space: nowrap; min-width: 52px; position: sticky; top: 0; z-index: 1; }
+  th.month-col.cur-fy { background: #3a3a3a; }
+
+  /* Data cells */
+  td.cell { text-align: center; padding: 4px 6px; border-right: 1px solid rgba(255,255,255,0.08); border-bottom: 1px solid rgba(0,0,0,0.06); font-size: 10px; font-weight: 500; min-width: 52px; cursor: default; transition: filter 0.1s; }
+  td.cell:hover { filter: brightness(1.1); }
+  td.cell.empty { background: #f0f0f0; color: var(--muted); }
+  tr:last-child td { border-bottom: none; }
+
+  .no-data { text-align: center; padding: 40px; color: var(--muted); font-size: 11px; text-transform: uppercase; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="title">Monthly Recovery Performance — All Claims (excl. Intervention)</div>
+  <div class="legend-row">
+    <span class="legend-label">Low</span>
+    <div class="legend-bar" id="legend-bar"></div>
+    <span class="legend-label">High</span>
+    <span class="legend-label" id="legend-range" style="margin-left:8px;"></span>
+  </div>
+</div>
+
+<div class="table-wrap">
+  <div id="table-container"><div class="no-data">Waiting for data…</div></div>
+</div>
+
+<script>
+function getParams() {
+  const fullHref = decodeURIComponent(location.href);
+  const hashIdx = fullHref.indexOf('#');
+  return hashIdx >= 0 ? fullHref.slice(hashIdx + 1) : '';
+}
+
+function fmtPct(v) {
+  if (v === 0 || v === null || v === undefined) return '';
+  return (v / 100).toFixed(1) + '%';
+}
+
+// Heatmap colour: red (low) → white (mid) → green (high), relative to min/max
+function cellColor(val, min, max) {
+  if (val === 0) return null;
+  const mid = (min + max) / 2;
+  let r, g, b;
+  if (val <= mid) {
+    const t = max === min ? 0 : (val - min) / (mid - min);
+    r = Math.round(248 + (255 - 248) * t);
+    g = Math.round(88  + (255 - 88)  * t);
+    b = Math.round(88  + (255 - 88)  * t);
+  } else {
+    const t = max === min ? 1 : (val - mid) / (max - mid);
+    r = Math.round(255 - (255 - 174) * t);
+    g = Math.round(255 - (255 - 235) * t);
+    b = Math.round(255 - (255 - 89)  * t);
+  }
+  return `rgb(${r},${g},${b})`;
+}
+
+function textColor(val, min, max) {
+  if (val === 0) return '';
+  const mid = (min + max) / 2;
+  // Dark text on light colours (near mid), light text on extremes
+  const dist = Math.abs(val - mid) / (max - min || 1);
+  return dist > 0.4 ? '#242424' : '#242424';
+}
+
+function buildLegend(min, max) {
+  const bar = document.getElementById('legend-bar');
+  const steps = 20;
+  bar.innerHTML = '';
+  for (let i = 0; i < steps; i++) {
+    const v = min + (max - min) * (i / (steps - 1));
+    const div = document.createElement('div');
+    div.className = 'legend-bar-fill';
+    div.style.background = cellColor(v, min, max) || '#f0f0f0';
+    bar.appendChild(div);
+  }
+  document.getElementById('legend-range').textContent =
+    `${fmtPct(min)} – ${fmtPct(max)}`;
+}
+
+function render() {
+  const raw = getParams();
+  if (!raw) return;
+
+  // Format: monthLabels ^ FY~row | FY~row ...
+  // monthLabels = pipe-separated MMM-YY strings (first block before first ^)
+  const parts = raw.split('^');
+  if (parts.length < 2) return;
+
+  const months = parts[0].split('|').filter(m => m.length > 0);
+
+  const rows = [];
+  for (let i = 1; i < parts.length; i++) {
+    const tilde = parts[i].indexOf('~');
+    if (tilde < 0) continue;
+    const fy = parts[i].slice(0, tilde);
+    const vals = parts[i].slice(tilde + 1).split('|').map(v => parseInt(v, 10) || 0);
+    rows.push({ fy, vals });
+  }
+
+  if (!months.length || !rows.length) return;
+
+  // Collect all non-zero values for colour scaling
+  const allVals = rows.flatMap(r => r.vals).filter(v => v > 0);
+  if (!allVals.length) return;
+  const minVal = Math.min(...allVals);
+  const maxVal = Math.max(...allVals);
+
+  buildLegend(minVal, maxVal);
+
+  // Build table
+  let html = '<table><thead><tr>';
+  html += '<th class="fy-col">Year</th>';
+  months.forEach(m => {
+    html += `<th class="month-col">${m}</th>`;
+  });
+  html += '</tr></thead><tbody>';
+
+  rows.forEach(({ fy, vals }) => {
+    html += '<tr>';
+    html += `<td class="fy-col">${fy}</td>`;
+    months.forEach((_, ci) => {
+      const v = vals[ci] !== undefined ? vals[ci] : 0;
+      if (v === 0) {
+        html += '<td class="cell empty">—</td>';
+      } else {
+        const bg = cellColor(v, minVal, maxVal);
+        const fg = textColor(v, minVal, maxVal);
+        html += `<td class="cell" style="background:${bg};color:${fg}" title="${fmtPct(v)}">${fmtPct(v)}</td>`;
+      }
+    });
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  document.getElementById('table-container').innerHTML = html;
+}
+
+render();
+</script>
+</body>
+</html>
