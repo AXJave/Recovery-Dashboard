@@ -31,6 +31,7 @@
   .tpi-toggle.filtered { border-color: var(--collected); color: #242424; background: #f0fde0; }
   .tpi-toggle::after { content: '▾'; font-size: 10px; }
   .tpi-panel { display: none; position: absolute; right: 0; top: calc(100% + 2px); background: var(--surface); border: 1px solid var(--border); min-width: 160px; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+  .tpi-options-scroll { max-height: 180px; overflow-y: auto; }
   .tpi-panel.open { display: block; }
   .tpi-panel-header { display: flex; justify-content: space-between; padding: 6px 8px; border-bottom: 1px solid var(--border); }
   .tpi-panel-header button { background: none; border: none; font-family: var(--font); font-size: 9px; color: var(--text-secondary); cursor: pointer; text-transform: uppercase; letter-spacing: 0.5px; padding: 0; }
@@ -92,7 +93,7 @@
           <button onclick="selectAllTPI()">Select All</button>
           <button onclick="clearTPI()">Clear</button>
         </div>
-        <div id="tpi-options"></div>
+        <div class="tpi-options-scroll"><div id="tpi-options"></div></div>
       </div>
     </div>
   </div>
@@ -126,6 +127,7 @@ let FY_LIST = [];
 let TPI_GROUPS = [];
 let selectedTPI = new Set();
 let MONTHLY_CASH = []; // module-scope so tooltip closure always reads current value
+let MONTHLY_REV = [];  // single-month revenue derived from cumulative diff
 
 function getParams() {
   // Power BI HTML Content Viewer may URL-encode the iframe src, turning # into %23.
@@ -310,8 +312,10 @@ function updateChart() {
   const perfLine      = f.rev.map((r,i) => r > 0 ? f.cash[i] / r : null);
   const targetLine    = d.months.map(() => f.target);
 
-  // Monthly cash series (non-cumulative) — used only in tooltip
+  // Monthly (non-cumulative) cash and revenue — for tooltip % 
   MONTHLY_CASH = (f.cashM && f.cashM.length) ? f.cashM : [];
+  // Derive monthly revenue from cumulative diff: rev[i] - rev[i-1]
+  MONTHLY_REV = f.rev.map((v, i) => i === 0 ? v : v - f.rev[i-1]);
 
   const validPerf = perfLine.filter(v => v !== null && !isNaN(v) && isFinite(v));
   const maxPerf   = validPerf.length ? Math.max(...validPerf) : 1;
@@ -330,12 +334,13 @@ function updateChart() {
       return ` ${ctx.dataset.label}: ${fmtPct(ctx.parsed.y)}`;
     },
     afterBody(items) {
-      if (!MONTHLY_CASH.length) return [];
+      if (!MONTHLY_CASH.length || !MONTHLY_REV.length) return [];
       const idx = items[0]?.dataIndex;
       if (idx === undefined) return [];
-      const val = MONTHLY_CASH[idx];
-      if (val === undefined || val === null || isNaN(val)) return [];
-      return [` Monthly Recovery: ${fmt(val)}`];
+      const cash = MONTHLY_CASH[idx];
+      const rev  = MONTHLY_REV[idx];
+      if (!cash || !rev || rev === 0) return [];
+      return [` Monthly Performance: ${fmtPct(cash / rev)}`];
     }
   };
 
