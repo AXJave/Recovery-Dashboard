@@ -70,46 +70,68 @@ function fmtPct(v) {
   return (v / 100).toFixed(1) + '%';
 }
 
-// Heatmap colour: red (low) → white (mid) → green (high), relative to min/max
-function cellColor(val, min, max) {
+// Heatmap colour: fixed percentage bands
+// 0-50 shades of red, 51-70 shades of orange, 71-89 shades of yellow, 90+ shades of green
+// val is encoded as ratio × 10000, so val/100 = percentage (e.g. 5000 → 50.0%)
+function cellColor(val) {
   if (val === 0) return null;
-  const mid = (min + max) / 2;
-  let r, g, b;
-  if (val <= mid) {
-    const t = max === min ? 0 : (val - min) / (mid - min);
-    r = Math.round(248 + (255 - 248) * t);
-    g = Math.round(88  + (255 - 88)  * t);
-    b = Math.round(88  + (255 - 88)  * t);
+  const pct = val / 100; // convert to 0-100+ scale
+
+  if (pct <= 50) {
+    // shades of red: darker/more saturated red as pct drops toward 0
+    const t = Math.max(0, Math.min(1, pct / 50)); // 0 at pct=0, 1 at pct=50
+    // light red (near 50) → deep red (near 0)
+    const r = 255;
+    const g = Math.round(120 + (220 - 120) * t);
+    const b = Math.round(120 + (220 - 120) * t);
+    return `rgb(${r},${g},${b})`;
+  } else if (pct <= 70) {
+    // shades of orange: 51-70
+    const t = Math.max(0, Math.min(1, (pct - 51) / (70 - 51)));
+    const r = 255;
+    const g = Math.round(170 + (210 - 170) * t);
+    const b = Math.round(80  + (140 - 80)  * t);
+    return `rgb(${r},${g},${b})`;
+  } else if (pct <= 89) {
+    // shades of yellow: 71-89
+    const t = Math.max(0, Math.min(1, (pct - 71) / (89 - 71)));
+    const r = Math.round(255 - (255 - 240) * t);
+    const g = Math.round(235 - (235 - 220) * t);
+    const b = Math.round(100 + (180 - 100) * t);
+    return `rgb(${r},${g},${b})`;
   } else {
-    const t = max === min ? 1 : (val - mid) / (max - mid);
-    r = Math.round(255 - (255 - 174) * t);
-    g = Math.round(255 - (255 - 235) * t);
-    b = Math.round(255 - (255 - 89)  * t);
+    // shades of green: 90+ (scaling toward deepest green by 150%)
+    const t = Math.max(0, Math.min(1, (pct - 90) / (150 - 90)));
+    const r = Math.round(220 - (220 - 130) * t);
+    const g = Math.round(235 - (235 - 200) * t);
+    const b = Math.round(150 - (150 - 80)  * t);
+    return `rgb(${r},${g},${b})`;
   }
-  return `rgb(${r},${g},${b})`;
 }
 
-function textColor(val, min, max) {
+function textColor(val) {
   if (val === 0) return '';
-  const mid = (min + max) / 2;
-  // Dark text on light colours (near mid), light text on extremes
-  const dist = Math.abs(val - mid) / (max - min || 1);
-  return dist > 0.4 ? '#242424' : '#242424';
+  return '#242424';
 }
 
-function buildLegend(min, max) {
+function buildLegendBands() {
   const bar = document.getElementById('legend-bar');
-  const steps = 20;
   bar.innerHTML = '';
-  for (let i = 0; i < steps; i++) {
-    const v = min + (max - min) * (i / (steps - 1));
+  const bands = [
+    { label: '0-50', from: 0,  to: 50 },
+    { label: '51-70', from: 51, to: 70 },
+    { label: '71-89', from: 71, to: 89 },
+    { label: '90+',   from: 90, to: 150 },
+  ];
+  bands.forEach(b => {
+    const mid = (b.from + b.to) / 2;
     const div = document.createElement('div');
     div.className = 'legend-bar-fill';
-    div.style.background = cellColor(v, min, max) || '#f0f0f0';
+    div.style.background = cellColor(mid * 100);
+    div.title = b.label + '%';
     bar.appendChild(div);
-  }
-  document.getElementById('legend-range').textContent =
-    `${fmtPct(min)} – ${fmtPct(max)}`;
+  });
+  document.getElementById('legend-range').textContent = 'Red 0-50% · Orange 51-70% · Yellow 71-89% · Green 90%+';
 }
 
 function render() {
@@ -134,13 +156,7 @@ function render() {
 
   if (!months.length || !rows.length) return;
 
-  // Collect all non-zero values for colour scaling
-  const allVals = rows.flatMap(r => r.vals).filter(v => v > 0);
-  if (!allVals.length) return;
-  const minVal = Math.min(...allVals);
-  const maxVal = Math.max(...allVals);
-
-  buildLegend(minVal, maxVal);
+  buildLegendBands();
 
   // Build table
   let html = '<table><thead><tr>';
@@ -158,8 +174,8 @@ function render() {
       if (v === 0) {
         html += '<td class="cell empty">—</td>';
       } else {
-        const bg = cellColor(v, minVal, maxVal);
-        const fg = textColor(v, minVal, maxVal);
+        const bg = cellColor(v);
+        const fg = textColor(v);
         html += `<td class="cell" style="background:${bg};color:${fg}" title="${fmtPct(v)}">${fmtPct(v)}</td>`;
       }
     });
