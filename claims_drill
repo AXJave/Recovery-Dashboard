@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claims Drill</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+  :root {
+    --bg: #F7F7F7; --surface: #ffffff; --border: #e0e0e0;
+    --collected: #AEEB59; --perf-below: #F85858;
+    --text-primary: #242424; --text-secondary: #666; --text-muted: #999;
+    --font: 'Inter', sans-serif; --header-bg: #242424; --row-alt: #f9f9f9;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; }
+  body { background: var(--bg); color: var(--text-primary); font-family: var(--font); font-size: 11px; display: flex; flex-direction: column; padding: 10px; gap: 8px; }
+
+  .top-bar { display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: wrap; }
+  .title { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); }
+
+  .filter-bar { display: flex; gap: 6px; flex-wrap: wrap; flex-shrink: 0; align-items: center; }
+  .filter-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+
+  select { background: var(--surface); border: 1px solid var(--border); color: var(--text-primary); font-family: var(--font); font-size: 10px; padding: 4px 8px; cursor: pointer; }
+  select:focus { outline: none; border-color: var(--collected); }
+
+  .summary-bar { display: flex; gap: 16px; flex-shrink: 0; background: var(--surface); border: 1px solid var(--border); padding: 8px 12px; }
+  .summary-item { display: flex; flex-direction: column; gap: 2px; }
+  .summary-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+  .summary-value { font-size: 14px; font-weight: 700; }
+  .under { color: var(--perf-below); }
+
+  .table-wrap { flex: 1; overflow-y: auto; overflow-x: auto; background: var(--surface); border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; font-size: 10px; }
+  th { background: var(--header-bg); color: #fff; padding: 6px 10px; text-align: left; font-weight: 600; font-size: 9px; letter-spacing: 0.5px; white-space: nowrap; position: sticky; top: 0; cursor: pointer; user-select: none; }
+  th:hover { background: #333; }
+  th .sort-arrow { margin-left: 4px; opacity: 0.5; }
+  th.sorted .sort-arrow { opacity: 1; }
+  td { padding: 5px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  tr:nth-child(even) td { background: var(--row-alt); }
+  tr:hover td { background: #f0fde0; }
+  td.num { text-align: right; }
+  td.under-val { text-align: right; color: var(--perf-below); font-weight: 600; }
+  td.pct { text-align: right; }
+
+  .no-data { text-align: center; padding: 40px; color: var(--text-muted); font-size: 11px; text-transform: uppercase; }
+
+  .search-wrap { margin-left: auto; }
+  input[type=text] { background: var(--surface); border: 1px solid var(--border); font-family: var(--font); font-size: 10px; padding: 4px 8px; width: 160px; }
+  input[type=text]:focus { outline: none; border-color: var(--collected); }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <span class="title">Under-Recovered Claims</span>
+  <div class="search-wrap">
+    <input type="text" id="search" placeholder="Search claim ID..." oninput="applyFilters()">
+  </div>
+</div>
+
+<div class="filter-bar">
+  <span class="filter-label">FY</span>
+  <select id="sel-fy" onchange="applyFilters()"><option value="">All</option></select>
+  <span class="filter-label">Pillar</span>
+  <select id="sel-pillar" onchange="applyFilters()"><option value="">All</option></select>
+  <span class="filter-label">Up to month</span>
+  <select id="sel-month" onchange="applyFilters()"><option value="">All months</option></select>
+  <span class="filter-label">TPI Group</span>
+  <select id="sel-tpi" onchange="applyFilters()"><option value="">All</option></select>
+</div>
+
+<div class="summary-bar">
+  <div class="summary-item"><span class="summary-label">Claims shown</span><span class="summary-value" id="sum-count">—</span></div>
+  <div class="summary-item"><span class="summary-label">Total Billed (Rev)</span><span class="summary-value" id="sum-rev">—</span></div>
+  <div class="summary-item"><span class="summary-label">Total Cash</span><span class="summary-value" id="sum-cash">—</span></div>
+  <div class="summary-item"><span class="summary-label">Under-Recovery</span><span class="summary-value under" id="sum-under">—</span></div>
+  <div class="summary-item"><span class="summary-label">Recovery %</span><span class="summary-value" id="sum-pct">—</span></div>
+</div>
+
+<div class="table-wrap">
+  <table id="claims-table">
+    <thead>
+      <tr>
+        <th onclick="sortBy('id')" id="th-id">Claim ID <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('fy')" id="th-fy">FY <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('pillar')" id="th-pillar">Pillar <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('tpi')" id="th-tpi">TPI Group <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('month')" id="th-month">Closure Month <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('rev')" id="th-rev">Revenue (£k) <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('cash')" id="th-cash">Cash (£k) <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('under')" id="th-under">Under-Recovery (£k) <span class="sort-arrow">↕</span></th>
+        <th onclick="sortBy('pct')" id="th-pct">Recovery % <span class="sort-arrow">↕</span></th>
+      </tr>
+    </thead>
+    <tbody id="table-body"></tbody>
+  </table>
+</div>
+
+<script>
+let ALL_CLAIMS = [];
+let sortCol = 'under';
+let sortDir = -1; // -1 = desc, 1 = asc
+
+function getParams() {
+  const fullHref = decodeURIComponent(location.href);
+  const hashIdx = fullHref.indexOf('#');
+  return hashIdx >= 0 ? fullHref.slice(hashIdx + 1) : '';
+}
+
+function fmt(n) {
+  if (isNaN(n) || n === 0) return '£0';
+  if (Math.abs(n) >= 1000) return '£' + (n / 1000).toFixed(2) + 'M';
+  return '£' + n.toFixed(2) + 'k';
+}
+function fmtPct(n) {
+  if (isNaN(n) || !isFinite(n)) return '—';
+  return (n * 100).toFixed(1) + '%';
+}
+
+function parseData() {
+  const raw = getParams();
+  if (!raw) return [];
+  return raw.split('^').filter(r => r.length > 0).map(row => {
+    const f = row.split('~');
+    // fields: axclaimid~cash(k)~rev(k)~tpigroup~closuremonthLabel~closuremonthSort~fy~pillar
+    const cash = parseFloat(f[1]) || 0;
+    const rev  = parseFloat(f[2]) || 0;
+    return {
+      id:      f[0] || '',
+      cash,
+      rev,
+      under:   rev - cash,
+      pct:     rev > 0 ? cash / rev : 0,
+      tpi:     f[3] || '',
+      monthLabel: f[4] || '',
+      monthSort:  f[5] || '', // YYYY-MM for correct chronological sort
+      fy:      f[6] || '',
+      pillar:  f[7] || '',
+    };
+  });
+}
+
+function populateFilters(claims) {
+  const fys     = [...new Set(claims.map(c => c.fy))].sort();
+  const pillars = [...new Set(claims.map(c => c.pillar))].sort();
+  const months  = [...new Set(claims.map(c => c.monthSort))].sort();
+  const tpis    = [...new Set(claims.map(c => c.tpi))].filter(t => t).sort();
+
+  const selFy     = document.getElementById('sel-fy');
+  const selPillar = document.getElementById('sel-pillar');
+  const selMonth  = document.getElementById('sel-month');
+  const selTpi    = document.getElementById('sel-tpi');
+
+  fys.forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v; selFy.appendChild(o); });
+  pillars.forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v; selPillar.appendChild(o); });
+
+  // Month dropdown: "up to MMM-YY" — selecting a month shows all claims up to and including that month
+  months.forEach(v => {
+    const o = document.createElement('option');
+    o.value = v;
+    // Find the label for this sort key
+    const claim = claims.find(c => c.monthSort === v);
+    o.textContent = claim ? claim.monthLabel : v;
+    selMonth.appendChild(o);
+  });
+
+  tpis.forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v; selTpi.appendChild(o); });
+}
+
+function applyFilters() {
+  const fy      = document.getElementById('sel-fy').value;
+  const pillar  = document.getElementById('sel-pillar').value;
+  const month   = document.getElementById('sel-month').value;
+  const tpi     = document.getElementById('sel-tpi').value;
+  const search  = document.getElementById('search').value.toLowerCase().trim();
+
+  let filtered = ALL_CLAIMS.filter(c => {
+    if (fy     && c.fy !== fy)         return false;
+    if (pillar && c.pillar !== pillar)  return false;
+    if (month  && c.monthSort > month)  return false; // cumulative: up to selected month
+    if (tpi    && c.tpi !== tpi)        return false;
+    if (search && !c.id.toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  // Sort
+  filtered.sort((a, b) => {
+    const av = a[sortCol], bv = b[sortCol];
+    if (typeof av === 'string') return av.localeCompare(bv) * sortDir;
+    return (av - bv) * sortDir;
+  });
+
+  renderTable(filtered);
+  renderSummary(filtered);
+}
+
+function sortBy(col) {
+  if (sortCol === col) sortDir *= -1;
+  else { sortCol = col; sortDir = -1; }
+
+  // Update header arrows
+  document.querySelectorAll('th').forEach(th => th.classList.remove('sorted'));
+  const thMap = { id:'th-id', fy:'th-fy', pillar:'th-pillar', tpi:'th-tpi', month:'th-month', rev:'th-rev', cash:'th-cash', under:'th-under', pct:'th-pct' };
+  if (thMap[col]) document.getElementById(thMap[col]).classList.add('sorted');
+
+  applyFilters();
+}
+
+function renderTable(claims) {
+  const tbody = document.getElementById('table-body');
+  if (!claims.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="no-data">No claims match the selected filters</td></tr>';
+    return;
+  }
+  tbody.innerHTML = claims.map(c => `
+    <tr>
+      <td>${c.id}</td>
+      <td>${c.fy}</td>
+      <td>${c.pillar}</td>
+      <td>${c.tpi}</td>
+      <td>${c.monthLabel}</td>
+      <td class="num">${fmt(c.rev)}</td>
+      <td class="num">${fmt(c.cash)}</td>
+      <td class="under-val">${fmt(c.under)}</td>
+      <td class="pct">${fmtPct(c.pct)}</td>
+    </tr>`).join('');
+}
+
+function renderSummary(claims) {
+  const totalRev   = claims.reduce((s, c) => s + c.rev,   0);
+  const totalCash  = claims.reduce((s, c) => s + c.cash,  0);
+  const totalUnder = claims.reduce((s, c) => s + c.under, 0);
+  document.getElementById('sum-count').textContent = claims.length.toLocaleString();
+  document.getElementById('sum-rev').textContent   = fmt(totalRev);
+  document.getElementById('sum-cash').textContent  = fmt(totalCash);
+  document.getElementById('sum-under').textContent = fmt(totalUnder);
+  document.getElementById('sum-pct').textContent   = totalRev > 0 ? fmtPct(totalCash / totalRev) : '—';
+}
+
+function render() {
+  ALL_CLAIMS = parseData();
+  if (!ALL_CLAIMS.length) {
+    document.getElementById('table-body').innerHTML = '<tr><td colspan="9" class="no-data">Waiting for data...</td></tr>';
+    return;
+  }
+  populateFilters(ALL_CLAIMS);
+
+  // Check if a specific FY/pillar/month was passed in query string (from index.html click)
+  const qp = new URLSearchParams(location.search);
+  const presetFY     = qp.get('fy');
+  const presetPillar = qp.get('pillar');
+  const presetMonth  = qp.get('month');
+
+  if (presetFY)     document.getElementById('sel-fy').value     = presetFY;
+  if (presetPillar) document.getElementById('sel-pillar').value = presetPillar;
+  if (presetMonth)  document.getElementById('sel-month').value  = presetMonth;
+
+  // Default sort by under-recovery descending
+  document.getElementById('th-under').classList.add('sorted');
+  applyFilters();
+}
+
+render();
+</script>
+</body>
+</html>
