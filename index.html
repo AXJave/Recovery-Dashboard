@@ -262,6 +262,7 @@ function updateChart() {
     chartInstance.update();
   } else {
     const canvas = document.getElementById('mainChart');
+  canvas.style.cursor = 'pointer';
     canvas.width  = canvas.parentElement.offsetWidth;
     canvas.height = 220;
     const ctx = canvas.getContext('2d');
@@ -277,6 +278,38 @@ function updateChart() {
       options: {
         responsive:false, maintainAspectRatio:false, animation:{duration:350},
         interaction:{mode:'index', intersect:false},
+        onClick(event, elements) {
+          if (!elements || !elements.length) return;
+          const idx = elements[0].index;
+          const d = ALL_DATA[currentFY];
+          if (!d) return;
+          const month = d.months[idx]; // MMM-YY label
+          // Convert MMM-YY to YYYY-MM for the drill filter
+          const monthSort = (() => {
+            const parts = month.split('-');
+            if (parts.length !== 2) return '';
+            const monthNames = {Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
+            const mm = monthNames[parts[0]] || '01';
+            const yy = parseInt(parts[1], 10);
+            const yyyy = yy >= 50 ? 1900 + yy : 2000 + yy;
+            return `${yyyy}-${mm}`;
+          })();
+          // Map currentFilter to Pillar2 value used in DAX
+          const pillarMap = {
+            abiMain: 'ABIMainstream',
+            abiPres: 'ABIPrestige',
+            nonMain: 'Non ABIMainstream',
+            nonPres: 'Non ABIPrestige',
+            all: ''
+          };
+          const pillar = pillarMap[currentFilter] || '';
+          const base = 'https://axjave.github.io/Recovery-Dashboard/claims_drill.html';
+          const params = new URLSearchParams();
+          if (currentFY) params.set('fy', currentFY);
+          if (pillar)    params.set('pillar', pillar);
+          if (monthSort) params.set('month', monthSort);
+          window.open(`${base}?${params.toString()}`, '_blank');
+        },
         plugins:{
           legend:{display:false},
           tooltip:{
